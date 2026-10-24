@@ -1,0 +1,123 @@
+name: MENTOR baseline validation
+
+on:
+  push:
+    branches:
+      - feature/import-opentutor
+    paths:
+      - .github/workflows/ci.yml
+      - apps/**
+      - tests/**
+      - scripts/**
+      - package*.json
+      - pytest.ini
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mentor-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Backend unit tests, migrations and source compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DISABLE_RATE_LIMIT: "1"
+      CODE_SANDBOX_BACKEND: process
+      ENVIRONMENT: test
+      DATABASE_URL: sqlite+aiosqlite:////tmp/mentor-ci-tests.db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements-core.txt
+            apps/api/requirements-full.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r apps/api/requirements-full.txt
+          python -m pip install pytest
+
+      - name: Compile API sources
+        run: python -m compileall -q apps/api
+
+      - name: Run API unit tests
+        run: python -m pytest tests/ -q
+
+      - name: Validate Alembic migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: sqlite+aiosqlite:////tmp/mentor-ci-alembic.db
+          APP_AUTO_CREATE_TABLES: "false"
+        run: |
+          python -m alembic upgrade head
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          heads=ScriptDirectory.from_config(Config('alembic.ini')).get_heads()
+          assert len(heads)==1, f'Expected one migration head, got {heads}'
+          print('Alembic migration gate passed:', heads)
+          PY
+
+  frontend:
+    name: Frontend lint, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Web dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+
+      - name: Run Web lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Run Web unit tests
+        working-directory: apps/web
+        run: npm run test:run
+
+      - name: Run Web build
+        working-directory: apps/web
+        run: npm run build
+
+  source-integrity:
+    name: Source origin and workflow safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate pinned upstream and avoid unreviewed workflows
+        run: |
+          test "$(cat docs/upstream/opentutor/UPSTREAM_COMMIT)" = "2d2c003654cfbc90c173c9db6867ae65a65e8313"
+          grep -q 'MIT License' LICENSE
+          test -e apps/api/main.py
+          test -e apps/web/package.json
+          test -e tests/test_fsrs.py
+          test ! -e .github/workflows/deploy.yml
+          echo "Source integrity check succeeded."
