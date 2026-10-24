@@ -60,6 +60,21 @@ describe("layout-storage", () => {
     expect(layout?.blocks[1].position).toBe(1);
   });
 
+
+  it("preserves summary blocks through layout parsing", () => {
+    const layout = parseSpaceLayout({
+      templateId: "default",
+      columns: 2,
+      blocks: [{ id: "summary-1", type: "summary", position: 0, visible: true, source: "template" }],
+    });
+    expect(layout?.blocks).toHaveLength(1);
+    expect(layout?.blocks[0]).toMatchObject({
+      id: "summary-1",
+      type: "summary",
+      size: "medium",
+    });
+  });
+
   it("round-trips persisted layouts through local storage", () => {
     saveStoredSpaceLayout("course-1", {
       templateId: null,
