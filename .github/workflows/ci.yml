@@ -3,7 +3,9 @@ name: MENTOR baseline validation
 on:
   push:
     branches:
-      - feature/import-opentutor
+      - main
+      - 'feature/**'
+      - 'fix/**'
     paths:
       - .github/workflows/ci.yml
       - apps/**
@@ -12,7 +14,6 @@ on:
       - package*.json
       - pytest.ini
   workflow_dispatch:
-  pull_request:
 
 permissions:
   contents: read
@@ -24,7 +25,7 @@ concurrency:
 jobs:
   checks:
     name: Backend unit tests, migrations and source compilation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, k8s-deploy]
     timeout-minutes: 30
     env:
       DISABLE_RATE_LIMIT: "1"
@@ -32,6 +33,11 @@ jobs:
       ENVIRONMENT: test
       DATABASE_URL: sqlite+aiosqlite:////tmp/mentor-ci-tests.db
     steps:
+      - name: Verify dedicated self-hosted runner
+        shell: bash
+        run: |
+          echo "Runner: ${{ runner.name }}"
+          test "${{ runner.environment }}" = 'self-hosted'
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -73,7 +79,7 @@ jobs:
 
   frontend:
     name: Frontend lint, unit tests and build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, k8s-deploy]
     timeout-minutes: 20
     env:
       NEXT_TELEMETRY_DISABLED: "1"
@@ -107,7 +113,7 @@ jobs:
 
   source-integrity:
     name: Source origin and workflow safety
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, k8s-deploy]
     timeout-minutes: 5
     steps:
       - name: Checkout
