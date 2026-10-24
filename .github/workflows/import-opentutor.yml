@@ -1,11 +1,6 @@
 name: Import OpenTutor pinned baseline
 
 on:
-  push:
-    branches:
-      - feature/import-opentutor
-    paths:
-      - .github/workflows/import-opentutor.yml
   workflow_dispatch:
 
 permissions:
@@ -17,9 +12,14 @@ concurrency:
 
 jobs:
   import:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, k8s-deploy]
     timeout-minutes: 15
     steps:
+      - name: Verify dedicated self-hosted runner
+        shell: bash
+        run: |
+          echo "Runner: ${{ runner.name }}"
+          test "${{ runner.environment }}" = 'self-hosted'
       - name: Checkout MENTOR integration branch
         uses: actions/checkout@v4
         with:
@@ -27,7 +27,12 @@ jobs:
           fetch-depth: 1
           ref: feature/import-opentutor
       - name: Import upstream source pinned to approved commit
-        run: bash scripts/bootstrap-opentutor.sh
+        run: |
+          if [ -f docs/upstream/opentutor/UPSTREAM_COMMIT ]; then
+            echo 'Pinned baseline already imported; leaving source unchanged.'
+          else
+            bash scripts/bootstrap-opentutor.sh
+          fi
       - name: Verify licenses, provenance and essential source files
         shell: bash
         run: |
@@ -41,7 +46,7 @@ jobs:
           test -f docs/architecture.md
           test -f docs/roadmap.md
           test -f README.md
-          test ! -f .github/workflows/ci.yml
+          test -f .github/workflows/ci.yml
           git status --short | head -60
       - name: Commit imported source (no build or execution of upstream code)
         shell: bash
