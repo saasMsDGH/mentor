@@ -7,14 +7,9 @@ interface TimelineViewProps {
   courseId: string;
 }
 
-const URGENCY_COLORS = {
-  overdue: "bg-destructive text-destructive-foreground",
-  soon: "bg-warning text-warning-foreground",
-  normal: "bg-brand text-brand-foreground",
-  future: "bg-muted text-muted-foreground",
-};
+type Urgency = "overdue" | "soon" | "normal" | "future";
 
-function getUrgency(daysLeft: number): keyof typeof URGENCY_COLORS {
+function getUrgency(daysLeft: number): Urgency {
   if (daysLeft < 0) return "overdue";
   if (daysLeft <= 7) return "soon";
   if (daysLeft <= 30) return "normal";
@@ -29,16 +24,28 @@ function formatDaysLeft(daysLeft: number): string {
 }
 
 export function TimelineView({ courseId }: TimelineViewProps) {
-  const [goals, setGoals] = useState<StudyGoal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetched, setFetched] = useState<{
+    courseId: string;
+    goals: StudyGoal[];
+    failed: boolean;
+  } | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     listStudyGoals(courseId)
-      .then((g) => setGoals(g))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((goals) => {
+        if (!cancelled) setFetched({ courseId, goals, failed: false });
+      })
+      .catch(() => {
+        if (!cancelled) setFetched({ courseId, goals: [], failed: true });
+      });
+    return () => { cancelled = true; };
   }, [courseId]);
+
+  // A course switch must never display stale goals from the previous course.
+  const loading = fetched?.courseId !== courseId;
+  const goals = loading ? [] : (fetched?.goals ?? []);
+  const loadFailed = !loading && fetched?.failed;
 
   const today = useMemo(() => new Date(), []);
 
@@ -55,6 +62,14 @@ export function TimelineView({ courseId }: TimelineViewProps) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
         加载中…
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex items-center justify-center h-48 p-6 text-sm text-destructive">
+        无法加载学习目标，请稍后重试
       </div>
     );
   }
