@@ -1,0 +1,59 @@
+name: Import OpenTutor pinned baseline
+
+on:
+  push:
+    branches:
+      - feature/import-opentutor
+    paths:
+      - .github/workflows/import-opentutor.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-opentutor-baseline
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout MENTOR integration branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+          ref: feature/import-opentutor
+      - name: Import upstream source pinned to approved commit
+        run: bash scripts/bootstrap-opentutor.sh
+      - name: Verify licenses, provenance and essential source files
+        shell: bash
+        run: |
+          test -s LICENSE
+          grep -q 'MIT License' LICENSE
+          test -f apps/api/main.py
+          test -f apps/web/package.json
+          test -f apps/web/package-lock.json
+          test -f docs/upstream/opentutor/UPSTREAM_COMMIT
+          test "$(cat docs/upstream/opentutor/UPSTREAM_COMMIT)" = "2d2c003654cfbc90c173c9db6867ae65a65e8313"
+          test -f docs/architecture.md
+          test -f docs/roadmap.md
+          test -f README.md
+          test ! -f .github/workflows/ci.yml
+          git status --short | head -60
+      - name: Commit imported source (no build or execution of upstream code)
+        shell: bash
+        env:
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "chore: vendor OpenTutor source at 2d2c0036 (MIT)"
+            git push origin HEAD:feature/import-opentutor
+          fi
