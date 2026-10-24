@@ -28,12 +28,17 @@ ACTUAL="$(git -C "$TMP/opentutor" rev-parse HEAD)"
 
 # Préserver le README, les décisions et la roadmap MENTOR.
 # Importer les autres sources d'OpenTutor, y compris sa licence MIT.
-tar -C "$TMP/opentutor" --exclude='./.git' --exclude='./README.md' --exclude='./docs' -cf - . | tar -C "$ROOT" -xf -
+tar -C "$TMP/opentutor" --exclude='./.git' --exclude='./README.md' --exclude='./docs' --exclude='./.github' -cf - . | tar -C "$ROOT" -xf -
 
 # Conserver les documents amont séparément pour éviter de confondre les deux projets.
 mkdir -p "$ROOT/docs/upstream/opentutor"
 cp -a "$TMP/opentutor/docs/." "$ROOT/docs/upstream/opentutor/"
 cp "$TMP/opentutor/README.md" "$ROOT/docs/upstream/opentutor/README.md"
+# Les workflows CI amont sont conservés pour audit, mais non activés automatiquement.
+mkdir -p "$ROOT/docs/upstream/opentutor/github-workflows"
+if [[ -d "$TMP/opentutor/.github/workflows" ]]; then
+  cp -a "$TMP/opentutor/.github/workflows/." "$ROOT/docs/upstream/opentutor/github-workflows/"
+fi
 printf '%s\n' "$UPSTREAM_COMMIT" > "$ROOT/docs/upstream/opentutor/UPSTREAM_COMMIT"
 
 echo "OpenTutor importé au commit $ACTUAL."
