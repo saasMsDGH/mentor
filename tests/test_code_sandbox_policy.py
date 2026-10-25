@@ -1,5 +1,7 @@
 """Code sandbox policy regressions."""
 
+from unittest.mock import patch
+
 from services.agent.code_execution import (
     CodeExecutionAgent,
     pop_sandbox_backend_override,
@@ -27,7 +29,12 @@ def test_auto_backend_uses_process_fallback_only_when_explicitly_allowed(monkeyp
     token = push_sandbox_backend_override("auto")
     monkeypatch.setattr("services.agent.code_execution.process_sandbox_allowed", lambda: True)
     try:
-        result = agent._execute_safe("print(6)")
+        # Verify the explicit fallback policy without launching a subprocess.
+        with patch.object(agent, "_execute_in_process_sandbox", return_value={
+            "success": True, "output": "6", "error": "", "backend": "process"
+        }) as execution:
+            result = agent._execute_safe("print(6)")
+            execution.assert_called_once_with("print(6)")
     finally:
         pop_sandbox_backend_override(token)
 
