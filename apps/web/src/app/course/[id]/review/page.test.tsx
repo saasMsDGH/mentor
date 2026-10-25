@@ -97,5 +97,5 @@ describe("ReviewPage rating flow", () => {
     expect(submitReviewRating).toHaveBeenNthCalledWith(1, "course-1", "concept-1", "good");
     expect(submitReviewRating).toHaveBeenNthCalledWith(2, "course-1", "concept-1", "good");
     expect(trackApiFailure).toHaveBeenCalledTimes(1);
-  });
+  }, 15_000); // Allow slower jsdom/user-event interactions on self-hosted CI runners.
 });

@@ -30,7 +30,9 @@ jobs:
     env:
       DISABLE_RATE_LIMIT: "1"
       CODE_SANDBOX_BACKEND: process
-      ENVIRONMENT: test
+      # Only isolated unit tests: the upstream single-user fixture requires development mode.
+      # NEVER use this setting for a deployed or network-accessible runtime.
+      ENVIRONMENT: development
       DATABASE_URL: sqlite+aiosqlite:////tmp/mentor-ci-tests.db
     steps:
       - name: Verify dedicated self-hosted runner
