@@ -10,6 +10,7 @@ No external network access and no code-execution sandbox are required.
 """
 
 import uuid
+import os
 import json
 import socket
 from datetime import datetime, timedelta, timezone
@@ -51,14 +52,15 @@ async def learning_client(tmp_path: Path, monkeypatch):
     # this API/persistence test and has its own unit coverage.
     monkeypatch.setattr("services.parser.pdf._count_tokens", lambda text: len(text.split()))
     db_file = tmp_path / "mentor-learning.sqlite3"
-    engine = create_async_engine(
-        f"sqlite+aiosqlite:///{db_file}", poolclass=NullPool
-    )
+    postgres_dsn_file = os.environ.get("MENTOR_POSTGRES_APP_DSN_FILE")
+    url = Path(postgres_dsn_file).read_text().strip() if postgres_dsn_file else f"sqlite+aiosqlite:///{db_file}"
+    engine = create_async_engine(url, poolclass=NullPool)
     session_factory = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+    if not postgres_dsn_file:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
 
     user_id = uuid.uuid4()
     async with session_factory() as db:

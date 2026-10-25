@@ -77,4 +77,8 @@ class ConversationMemory(Base):
 
 
 # Keep index for faster keyword fallback scans on local datasets.
-Index("ix_mem_search_vector", ConversationMemory.search_vector)
+Index("ix_mem_search_vector", ConversationMemory.search_vector, postgresql_using="gin")
+
+# PostgreSQL-only: SQLite retains its JSON/Python similarity fallback.
+Index("ix_mem_embedding_hnsw", ConversationMemory.embedding,
+      postgresql_using="hnsw", postgresql_ops={"embedding": "vector_cosine_ops"}).ddl_if(dialect="postgresql")

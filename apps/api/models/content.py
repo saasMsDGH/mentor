@@ -59,6 +59,10 @@ class CourseContentTree(Base):
     children = relationship("CourseContentTree", back_populates="parent", cascade="all, delete-orphan")
     parent = relationship("CourseContentTree", back_populates="children", remote_side=[id])
 
-Index("ix_content_tree_search_vector", CourseContentTree.search_vector)
+Index("ix_content_tree_search_vector", CourseContentTree.search_vector, postgresql_using="gin")
 Index("ix_content_tree_course_parent", CourseContentTree.course_id, CourseContentTree.parent_id)
 Index("ix_content_tree_course_order", CourseContentTree.course_id, CourseContentTree.order_index)
+
+# PostgreSQL-only: SQLite retains its JSON/Python similarity fallback.
+Index("ix_content_tree_embedding_hnsw", CourseContentTree.embedding,
+      postgresql_using="hnsw", postgresql_ops={"embedding": "vector_cosine_ops"}).ddl_if(dialect="postgresql")

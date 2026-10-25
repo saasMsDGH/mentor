@@ -44,6 +44,8 @@ jobs:
           test "${{ runner.environment }}" = 'self-hosted'
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -84,6 +86,12 @@ jobs:
           # Use a separate pytest process to prevent stale event-loop sharing.
           python -m pytest tests/test_sqlite_mode.py -q -o addopts= --timeout=60
 
+      - name: Validate real PostgreSQL migrations, learning journey and restore
+        shell: bash
+        run: |
+          docker --host unix:///var/run/docker.sock pull pgvector/pgvector@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
+          python scripts/test_postgres.py
+
       - name: Validate Alembic revision graph (SQLite skips migrations)
         working-directory: apps/api
         env:
@@ -107,14 +115,17 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api
+      API_INTERNAL_URL: http://mentor-api:8000/api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
@@ -132,7 +143,9 @@ jobs:
 
       - name: Run Web build
         working-directory: apps/web
-        run: npm run build
+        run: |
+          npm run build
+          node ../../scripts/check-web-build.mjs
 
   source-integrity:
     name: Source origin and workflow safety
@@ -141,6 +154,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate pinned upstream and avoid unreviewed workflows
         run: |
           test "$(cat docs/upstream/opentutor/UPSTREAM_COMMIT)" = "2d2c003654cfbc90c173c9db6867ae65a65e8313"
@@ -151,3 +166,44 @@ jobs:
           test -e tests/test_fsrs.py
           test ! -e .github/workflows/deploy.yml
           echo "Source integrity check succeeded."
+
+  runtime-images:
+    name: Offline runtime images, authenticated API proxy and PostgreSQL restore
+    needs: [checks, frontend, source-integrity]
+    runs-on: [self-hosted, k8s-deploy]
+    timeout-minutes: 30
+    env:
+      MENTOR_API_TEST_IMAGE: mentor-api:ci-${{ github.run_id }}-${{ github.run_attempt }}
+      MENTOR_WEB_TEST_IMAGE: mentor-web:ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Prepare isolated test environment
+        shell: bash
+        run: |
+          VENV_PATH="$RUNNER_TEMP/mentor-images-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          python -m venv "$VENV_PATH"
+          echo "$VENV_PATH/bin" >> "$GITHUB_PATH"
+      - name: Install validation dependencies
+        run: python -m pip install -r apps/api/requirements-postgres.txt
+      - name: Prepare locked public dependency bundles
+        run: |
+          python scripts/prepare_runtime_dependencies.py api
+          python scripts/prepare_runtime_dependencies.py web
+      - name: Build runtime images without build network access
+        run: |
+          docker --host unix:///var/run/docker.sock build --network none --build-arg SOURCE_REVISION="$GITHUB_SHA" -f deploy/images/api.Dockerfile -t "$MENTOR_API_TEST_IMAGE" .
+          docker --host unix:///var/run/docker.sock build --network none --build-arg SOURCE_REVISION="$GITHUB_SHA" -f deploy/images/web.Dockerfile -t "$MENTOR_WEB_TEST_IMAGE" .
+      - name: Test isolated images and database restore
+        run: python scripts/test_postgres.py
+      - name: Remove only this run's temporary image tags
+        if: always()
+        run: |
+          docker --host unix:///var/run/docker.sock image rm "$MENTOR_API_TEST_IMAGE" "$MENTOR_WEB_TEST_IMAGE" || true

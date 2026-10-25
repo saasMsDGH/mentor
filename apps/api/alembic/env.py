@@ -12,18 +12,23 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from database import Base
-from models import *  # noqa: F401, F403 — register all models
-from config import settings as app_settings
-
 config = context.config
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.file_config.has_section("loggers"):
     fileConfig(config.config_file_name)
 
-# Use DATABASE_URL from app config (environment / .env) instead of hardcoded alembic.ini value
-config.set_main_option("sqlalchemy.url", app_settings.database_url)
-
-target_metadata = Base.metadata
+if config.get_main_option("mentor_postgresql") == "true":
+    # The frozen PostgreSQL history needs only a migration DSN, not runtime
+    # authentication/encryption keys or the application's create_all() engine.
+    database_url = config.attributes.get("database_url") or os.environ.get("DATABASE_URL", "")
+    if not database_url.startswith("postgresql+asyncpg://"):
+        raise RuntimeError("PostgreSQL migrations require DATABASE_URL with the asyncpg driver")
+    target_metadata = None
+else:
+    from database import Base
+    from config import settings as app_settings
+    database_url = config.attributes.get("database_url", app_settings.database_url)
+    target_metadata = Base.metadata
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
