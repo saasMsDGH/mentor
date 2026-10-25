@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     environment: str = "development"
 
-    # Database (SQLite-only local mode) — defaults to ~/.opentutor/data.db if DATABASE_URL not set
+    # Local default SQLite; PostgreSQL+asyncpg allowed for an explicitly configured deployment.
     database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
 
@@ -193,10 +193,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _resolve_database_url(self):
-        """Resolve database URL in SQLite-only local mode.
+        """Resolve a supported async database URL.
 
         - Empty/unset DATABASE_URL → SQLite at ~/.opentutor/data.db (lazy dir creation)
-        - DATABASE_URL must be a sqlite URL when explicitly set
+        - Explicit SQLite URL retains local development compatibility
+        - Explicit PostgreSQL URL must use postgresql+asyncpg://
         """
         if not self.database_url:
             data_dir = Path.home() / ".opentutor"
@@ -209,9 +210,14 @@ class Settings(BaseSettings):
                     if sqlite_path.startswith("~"):
                         self.database_url = f"{prefix}{Path(sqlite_path).expanduser()}"
                     break
+        elif self.database_url.startswith("postgresql+asyncpg://"):
+            # PostgreSQL is an opt-in integration path; it requires the
+            # PostgreSQL driver and dialect migration checks before deployment.
+            pass
         else:
             raise ValueError(
-                "SQLite-only local mode requires DATABASE_URL to be empty or start with sqlite"
+                "DATABASE_URL must be SQLite or postgresql+asyncpg://. "
+                "Synchronous or unsupported database URLs are not allowed."
             )
         return self
 
