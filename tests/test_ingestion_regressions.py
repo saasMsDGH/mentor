@@ -181,6 +181,7 @@ async def test_run_ingestion_pipeline_url_sets_source_fields():
     assert nodes
     assert all(n.source_type == "url" for n in nodes)
     assert all(n.source_file == target_url for n in nodes)
+    assert nodes[0].title == "Chapter 1"
 
 
 @pytest.mark.asyncio

@@ -128,6 +128,10 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
                 course_id=job.course_id,
                 source_file=source_file,
             )
+            # HTML extraction removes a repeated page heading from the body.
+            # Keep the extracted title on the root without changing provenance.
+            if job.source_type == "url" and nodes:
+                nodes[0].title = source_label
         for node in nodes:
             # Normalize source metadata to the ingestion source (file/url).
             node.source_type = job.source_type

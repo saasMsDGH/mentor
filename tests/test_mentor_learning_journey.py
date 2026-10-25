@@ -10,6 +10,10 @@ No external network access and no code-execution sandbox are required.
 """
 
 import uuid
+import json
+import socket
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock
 from pathlib import Path
 
 import pytest
@@ -32,6 +36,20 @@ from services.auth.dependency import get_current_user
 
 @pytest_asyncio.fixture
 async def learning_client(tmp_path: Path, monkeypatch):
+    def deny_internet(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6):
+            raise AssertionError("Learning journey must not open network connections")
+        return original_connect(sock, address)
+
+    def deny_dns(*args, **kwargs):
+        raise AssertionError("Learning journey must not resolve network hosts")
+
+    original_connect = socket.socket.connect
+    monkeypatch.setattr(socket, "getaddrinfo", deny_dns)
+    monkeypatch.setattr(socket.socket, "connect", deny_internet)
+    # Avoid tiktoken's first-use encoding download; token estimation is outside
+    # this API/persistence test and has its own unit coverage.
+    monkeypatch.setattr("services.parser.pdf._count_tokens", lambda text: len(text.split()))
     db_file = tmp_path / "mentor-learning.sqlite3"
     engine = create_async_engine(
         f"sqlite+aiosqlite:///{db_file}", poolclass=NullPool
@@ -70,6 +88,11 @@ async def learning_client(tmp_path: Path, monkeypatch):
         lambda task: task.cancel(),
     )
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
+    # Submission background jobs also use this test's database, never the
+    # process-global database (or a stale event loop from another test).
+    monkeypatch.setattr("routers.quiz_submission.async_session", session_factory)
+    monkeypatch.setattr("routers.quiz_submission._auto_derive_diagnostic", AsyncMock())
+    monkeypatch.setattr("routers.quiz_submission._auto_detect_confusion", AsyncMock())
     old_db_override = app.dependency_overrides.get(get_db)
     old_user_override = app.dependency_overrides.get(get_current_user)
     app.dependency_overrides[get_db] = override_db
@@ -195,3 +218,121 @@ async def test_document_to_quiz_to_persisted_learning_progress(learning_client):
         assert progress.quiz_correct == 1
         assert progress.fsrs_reps >= 1
         assert progress.next_review_at is not None
+
+
+@pytest.mark.asyncio
+async def test_generated_quiz_wrong_answer_due_review_and_recovery(learning_client, monkeypatch):
+    client, session_factory, user_id = learning_client
+    now = [datetime(2030, 1, 1, tzinfo=timezone.utc)]
+    monkeypatch.setattr("libs.datetime_utils.utcnow", lambda: now[0])
+    monkeypatch.setattr("services.progress.tracker._utcnow", lambda: now[0])
+    monkeypatch.setattr("routers.quiz_generation.ensure_llm_ready", AsyncMock())
+
+    async def chat(system, message):
+        if "classify student errors" in system:
+            return json.dumps({"category": "conceptual", "confidence": 0.9,
+                               "evidence": "Confusion avec une recherche linéaire",
+                               "related_concept": "Recherche dichotomique"}), {}
+        assert "tableau trié" in message
+        return json.dumps([{
+            "question_type": "mc",
+            "question": "Quelle condition doit respecter le tableau pour une recherche dichotomique ?",
+            "options": {"A": "Être trié", "B": "Être vide", "C": "Être aléatoire", "D": "Être inversé"},
+            "correct_answer": "A",
+            "explanation": "La recherche dichotomique exige un tableau trié pour éliminer la moitié des éléments.",
+            "difficulty_layer": 1,
+        }]), {}
+
+    provider = AsyncMock()
+    provider.chat.side_effect = chat
+    monkeypatch.setattr("services.parser.quiz.get_llm_client", lambda *args: provider)
+    monkeypatch.setattr("services.llm.router.get_llm_client", lambda *args: provider)
+
+    created = await client.post("/api/courses/", json={"name": "Algorithmes"})
+    assert created.status_code == 201, created.text
+    course_id = created.json()["id"]
+    source = ("La recherche dichotomique utilise un tableau trié. À chaque étape, "
+              "elle compare la cible au milieu et élimine la moitié des éléments. "
+              "Sa complexité en temps est logarithmique. La recherche linéaire parcourt tous les éléments.")
+    uploaded = await client.post("/api/content/upload", data={"course_id": course_id},
+                                 files={"file": ("algorithmes.md", source.encode(), "text/markdown")})
+    assert uploaded.status_code == 200, uploaded.text
+    async with session_factory() as db:
+        nodes = (await db.execute(select(CourseContentTree).where(
+            CourseContentTree.course_id == uuid.UUID(course_id),
+            CourseContentTree.content.isnot(None),
+        ))).scalars().all()
+        node = next(n for n in nodes if "tableau trié" in n.content)
+        node_id = node.id
+        assert node.source_file == "algorithmes.md"
+
+    generated = await client.post("/api/quiz/extract", json={
+        "course_id": course_id, "content_node_id": str(node_id),
+    })
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["problems_created"] == 1
+    listed = (await client.get(f"/api/quiz/{course_id}")).json()
+    question_id = listed[0]["id"]
+    assert "correct_answer" not in listed[0]
+    async with session_factory() as db:
+        question = await db.get(PracticeProblem, uuid.UUID(question_id))
+        assert question.content_node_id == node_id
+        assert question.source == "extracted"
+        # These questions must never appear in the due queue.
+        for archived, diagnostic in [(True, False), (False, True)]:
+            db.add(PracticeProblem(course_id=uuid.UUID(course_id), content_node_id=node_id,
+                                   question_type="mc", question="Hidden question", correct_answer="A",
+                                   is_archived=archived, is_diagnostic=diagnostic))
+        await db.commit()
+
+    due_url = f"/api/quiz/{course_id}/due-review"
+    assert (await client.get(due_url)).json() == []
+    wrong = await client.post("/api/quiz/submit", json={"problem_id": question_id, "user_answer": "B"})
+    assert wrong.status_code == 200, wrong.text
+    assert wrong.json()["is_correct"] is False
+    assert wrong.json()["warnings"] == []
+    assert (await client.get(due_url)).json() == []
+    async with session_factory() as db:
+        progress = (await db.execute(select(LearningProgress).where(
+            LearningProgress.user_id == user_id, LearningProgress.content_node_id == node_id,
+        ))).scalar_one()
+        assert (progress.quiz_attempts, progress.quiz_correct, progress.fsrs_reps) == (1, 0, 1)
+        now[0] = progress.next_review_at + timedelta(seconds=1)
+
+    due = await client.get(due_url)
+    assert due.status_code == 200, due.text
+    assert [q["id"] for q in due.json()] == [question_id]
+    assert due.json()[0]["content_node_id"] == str(node_id)
+    assert "correct_answer" not in due.json()[0]
+    assert "explanation" not in due.json()[0]
+    recovered = await client.post("/api/quiz/submit", json={"problem_id": question_id, "user_answer": "A"})
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["is_correct"] is True
+    assert recovered.json()["warnings"] == []
+    assert (await client.get(due_url)).json() == []
+    async with session_factory() as db:
+        progress = (await db.execute(select(LearningProgress).where(
+            LearningProgress.user_id == user_id, LearningProgress.content_node_id == node_id,
+        ))).scalar_one()
+        assert (progress.quiz_attempts, progress.quiz_correct, progress.fsrs_reps) == (2, 1, 2)
+        assert progress.next_review_at > now[0]
+        attempts = (await db.execute(select(PracticeResult).where(
+            PracticeResult.problem_id == uuid.UUID(question_id),
+        ))).scalars().all()
+        assert len(attempts) == 2
+
+    assert (await client.get(due_url + "?limit=0")).status_code == 422
+    other_user = uuid.uuid4()
+    async with session_factory() as db:
+        db.add(User(id=other_user, name="Other learner"))
+        await db.commit()
+
+    async def other_identity(request: Request):
+        request.state.user_id = str(other_user)
+        return User(id=other_user, name="Other learner")
+
+    app.dependency_overrides[get_current_user] = other_identity
+    assert (await client.get(due_url)).status_code == 404
+    forbidden = await client.post("/api/quiz/submit", json={"problem_id": question_id, "user_answer": "A"})
+    assert forbidden.status_code == 404
+    assert provider.chat.await_count == 2  # generation + error classification only
