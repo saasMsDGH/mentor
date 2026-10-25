@@ -41,7 +41,11 @@ async def learning_client(tmp_path: Path, monkeypatch):
             raise AssertionError("Learning journey must not open network connections")
         return original_connect(sock, address)
 
+    def deny_dns(*args, **kwargs):
+        raise AssertionError("Learning journey must not resolve network hosts")
+
     original_connect = socket.socket.connect
+    monkeypatch.setattr(socket, "getaddrinfo", deny_dns)
     monkeypatch.setattr(socket.socket, "connect", deny_internet)
     # Avoid tiktoken's first-use encoding download; token estimation is outside
     # this API/persistence test and has its own unit coverage.
