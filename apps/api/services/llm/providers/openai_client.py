@@ -47,12 +47,12 @@ class OpenAIClient(LLMClient):
         self.model = model
 
     async def ping(self) -> bool:
-        """Probe local backends and authenticated Gemini model metadata.
+        """Probe local backends and authenticated Gemini/custom model metadata.
 
         Classifies errors: unreachable / auth / rate_limit / timeout / server_error.
         """
-        if self.provider_name == "gemini":
-            return await self._ping_gemini()
+        if self.provider_name in {"gemini", "custom"}:
+            return await self._ping_authenticated_model()
         if self.provider_name not in self._NO_STREAM_OPTIONS:
             return self.is_healthy  # Cloud APIs: trust cached status
         try:
@@ -84,18 +84,26 @@ class OpenAIClient(LLMClient):
             self.mark_unhealthy(f"probe_error: {e}")
             return False
 
-    async def _ping_gemini(self) -> bool:
+    async def _ping_authenticated_model(self) -> bool:
         """Check authenticated model metadata without sending a prompt.
 
-        Do not trust the initial circuit-breaker state as evidence of Gemini
-        reachability. Bound probe latency/retries; expose only error categories,
+        Custom gateways require the same Bearer credential as generation.
+        Bound probe latency/retries; expose only error categories,
         never provider response bodies or credentials in readiness diagnostics.
         """
         try:
             async with asyncio.timeout(5.0):
-                model = await self.client.with_options(timeout=5.0, max_retries=0).models.retrieve(self.model)
-            if not isinstance(model.id, str) or model.id.removeprefix("models/") != self.model.removeprefix("models/"):
-                self.mark_unhealthy("model_mismatch")
+                client = self.client.with_options(timeout=5.0, max_retries=0)
+                if self.provider_name == "custom":
+                    # Gateways need not expose /models/<provider/model>.
+                    # Their authenticated catalog must contain the exact route.
+                    catalog = await client.models.list()
+                    available = any(model.id == self.model for model in catalog.data)
+                else:
+                    model = await client.models.retrieve(self.model)
+                    available = isinstance(model.id, str) and model.id.removeprefix("models/") == self.model.removeprefix("models/")
+            if not available:
+                self.mark_unhealthy("model_unavailable")
                 return False
             self.mark_healthy()
             return True

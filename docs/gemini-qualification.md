@@ -1,82 +1,112 @@
-# Gemini pour la qualification MENTOR
+# Gemini via OmniRoute pour la qualification MENTOR
 
-Choix utilisateur du 25 octobre 2026 : **Gemini**. En l'absence de précision sur
-le routage, le profil qual prépare l'accès Google natif déjà pris en charge par
-OpenTutor. Il ne passe pas par OmniRoute et n'ajoute pas de fournisseur de
-repli. Aucun appel Google réel ni document n'a été envoyé par ce lot.
+L'utilisateur a retenu Gemini puis autorisé la création d'une clé OmniRoute
+dédiée. Le profil qual passe désormais par **l'instance OmniRoute existante** ;
+les clés Google restent gérées par celle-ci et ne sont pas copiées dans MENTOR.
+Le connecteur Gemini natif reste disponible et testé indépendamment du profil.
 
 ## Configuration préparée
 
-`k8s/overlays/qual/model.yaml` contient uniquement les paramètres publics :
-`LLM_PROVIDER=gemini` et `LLM_MODEL=gemini-3.8-flash`. Cette version stable est
-le choix proposé pour le candidat, à vérifier avec le compte prévu ; le modèle
-ne dépend pas des valeurs par défaut historiques de l'application.
+`k8s/overlays/qual/model.yaml` fournit les paramètres publics :
 
-L'API utilise le SDK OpenAI existant et l'endpoint
-`https://generativelanguage.googleapis.com/v1beta/openai/`.
-La clé est lue depuis le Secret opérateur
-`mentor-model-credentials`, champ `GEMINI_API_KEY`. Ce Secret n'est ni généré
-ni stocké dans Git. Ne pas mettre une clé Google dans `OPENAI_API_KEY` ou
-réutiliser une clé du routeur OmniRoute. Aucun accès navigateur à cette clé
-n'est nécessaire ; seul le conteneur API la reçoit.
+| Paramètre | Valeur |
+|---|---|
+| `LLM_PROVIDER` | `custom` (connecteur OpenAI compatible existant) |
+| `CUSTOM_LLM_BASE_URL` | `http://omniroute.omniroute.svc.cluster.local/v1` |
+| `CUSTOM_LLM_MODEL` | `gemini/gemini-3.1-flash-lite` |
+| Clé côté MENTOR | Secret `mentor-model-credentials`, champ `CUSTOM_LLM_API_KEY` |
 
-Références officielles consultées :
-[compatibilité OpenAI, génération/streaming et métadonnées de modèle](https://ai.google.dev/gemini-api/docs/openai),
-[modèle stable Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash).
-Leur description est utilisée pour les contrats HTTP ; aucun code d'exemple
-Google ni nouvelle bibliothèque n'est importé dans le projet.
+L'endpoint interne et le port de pod 20128 ont été constatés dans le cluster.
+La route vient du catalogue **synchronisé de la connexion Gemini**, consulté
+via son API de gestion, et utilise un modèle
+[stable documenté par Google](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite).
+La liste générale d'OmniRoute annonçait aussi `gemini/gemini-3.7-flash`, mais
+celle-ci était refusée à la génération car absente du catalogue synchronisé.
+Aucun catalogue partagé ni compte fournisseur n'a été modifié pour contourner
+ce refus. Vérifier les deux catalogues lors d'un changement de modèle.
 
-## Readiness réellement probante
+## Clé dédiée réellement créée
 
-Le contrôle Gemini ne se contente plus de l'état initial « sain » du circuit
-breaker. Il vérifie les métadonnées **authentifiées du modèle configuré**, par
-GET, avec délai de 5 secondes et sans retry automatique. Il n'envoie ni prompt
-ni document. Une clé refusée, un modèle absent/différent, une limitation de
-requêtes, une panne ou une connexion indisponible maintiennent l'état dégradé.
-Les diagnostics ne conservent que des catégories ; les corps d'erreur du
-fournisseur ne sont pas publiés dans les logs de la sonde.
+La clé `mentor-qualification` a été créée par l'API de gestion locale officielle
+d'OmniRoute 3.8.50, avec l'autorisation explicite de l'utilisateur. Elle est
+conservée, sans affichage ni fichier local de clé, dans le Secret
+**`omniroute/mentor-qualification-client`**, champ `CUSTOM_LLM_API_KEY`.
+Les annotations indiquent l'identifiant de gestion, le modèle et l'expiration.
+Ce Secret est une réserve opérateur ; aucune Application ni namespace MENTOR
+n'a été créé pour le consommer.
 
-L'overlay donne 10 secondes à la readiness et une période de 30 secondes.
-Le moniteur existant conserve son cache de santé. L'accès aux métadonnées ne
-prouve pas qu'une génération aboutit : quota, réponse QCM, streaming et parcours
-pédagogique restent à exercer sur le compte de qualification autorisé.
+Restrictions relues après création : connexion Gemini dédiée uniquement,
+modèle explicite, aucun combo, aucun droit d'administration, scope
+`self:usage`, expiration sept jours après création. Pour cette clé seulement,
+`noLog=true`, cache en mode bypass et compression désactivée. Ces réglages ne
+modifient pas les autres clés. Ils ne constituent pas une garantie générale
+de non-conservation de données chez le fournisseur.
 
-L'essai des images locales avec clé Gemini factice et réseau interne fermé
-confirme le refus 503 de l'API et du proxy ; la même exécution valide les
-5 tests PostgreSQL et la restauration des 34 tables. Elle n'emploie aucune
-clé Google réelle et ne prouve pas la disponibilité de Gemini.
+Avant toute mutation, l'API a confirmé `cloudConfigured=false` et l'absence de
+destination cloud, malgré le drapeau `cloudEnabled=true`. Le code installé
+retourne sans synchroniser lorsqu'aucune destination n'est configurée. Ne pas
+activer une destination cloud sans revue : la synchronisation de cette version
+inclut les clés et les credentials fournisseurs. Aucun réglage cloud n'a été
+modifié. Référence du code examiné :
+[OmniRoute, révision 0915890](https://github.com/diegosouzapw/OmniRoute/tree/091589089cd134a94df9f6cdab9ba562b2cefd18).
+Aucun code OmniRoute n'est copié dans MENTOR et aucune dépendance n'est ajoutée.
 
-## Isolation conservée
+Après autorisation du déploiement, l'opérateur devra fournir cette clé au Secret
+`mentor-qual/mentor-model-credentials` par la procédure de secrets retenue,
+sans la copier dans Git, la description de PR ou le terminal. Cette propagation
+n'est pas encore effectuée. Renouveler la clé avant son expiration par la même
+procédure ; ne pas réutiliser une clé d'administration ou un compte tiers.
 
-Aucune exception Internet n'est ajoutée. DNS et PostgreSQL IONOS restent les
-seules sorties prévues. L'accès au domaine Google demeure **bloqué** et la
-qualification ne peut donc pas réussir en l'état.
+## Réseau et santé
 
-Préparer avec l'opérateur un chemin limité à
-`generativelanguage.googleapis.com:443`, en conservant la vérification TLS.
-Les NetworkPolicies standards ne sélectionnent pas un FQDN ; aucune capacité
-FQDN du réseau actuel n'a été confirmée. Ne pas remplacer cette restriction
-par une permission TCP/443 vers tout Internet ou par une IP Google obtenue
-ponctuellement. Aucun proxy, CNI, pare-feu ou service partagé n'est modifié.
+L'overlay autorise uniquement les pods API MENTOR à joindre les pods
+`app=omniroute` du namespace `omniroute`, TCP/20128. Le namespaceSelector et le
+podSelector sont dans le même peer (ET). Le port 80 du Service est traduit vers
+20128 ; la politique cible le port du pod. Les autres sorties restent limitées
+à DNS et PostgreSQL IONOS. Aucune sortie directe Google ni permission générale
+Internet n'est ajoutée ; aucune politique n'a été appliquée au cluster par ce lot.
 
-Gemini est ici le fournisseur de **génération**. Le moteur d'embeddings hérité
-n'a pas de fournisseur Gemini : en mode auto sans autre clé compatible il
-utilise le repli sans embeddings. Les tests pgvector valident le stockage et
-les opérations vectorielles, pas la production d'embeddings par Gemini. Le
-choix/dimension du modèle d'embeddings reste un lot distinct.
+La sonde du connecteur custom utilise maintenant la même authentification
+Bearer que la génération. Elle exige le modèle exact dans `/v1/models`,
+limite la durée globale à cinq secondes et désactive les retries. Le connecteur
+Gemini natif conserve sa vérification authentifiée de métadonnées du modèle.
+Les diagnostics ne publient que des catégories, jamais les corps d'erreur.
 
-## Vérification locale sans accès Google
+**Le catalogue ne prouve pas la disponibilité de la génération en amont.**
+Le décalage constaté sur Gemini 3.7 le démontre. Une preuve de génération réelle
+et le parcours métier depuis le déploiement restent indispensables, en plus
+des probes. Ne pas donner de droit de gestion à la clé applicative pour lire
+le catalogue administrateur.
 
-Avec le profil CI Python installé :
+## Vérifications
 
 ```sh
 ENVIRONMENT=development DATABASE_URL=sqlite+aiosqlite:////tmp/mentor-local-tests.db \
-python -m pytest tests/test_gemini_qualification.py \
-  tests/test_argocd_qualification.py -q -o addopts= --timeout=30
+python -m pytest tests/test_omniroute_qualification.py \
+  tests/test_gemini_qualification.py tests/test_argocd_qualification.py \
+  -q -o addopts= --timeout=30
 ```
 
-Le vrai SDK s'exécute sur un transport HTTP en mémoire : authentification,
-chemin du modèle, refus et reprise de readiness, payload QCM, streaming et
-comptage d'usage sont vérifiés. Ce résultat n'est pas une génération Gemini
-réelle. L'activation Kubernetes reste soumise à l'autorisation de déploiement
-et aux autres [conditions de promotion](production-readiness.md).
+Ces tests utilisent le vrai SDK sur un transport HTTP en mémoire : Bearer,
+modèle, refus et reprise, QCM, SSE et rendu réseau. Les vérifications réelles
+sur la clé créée ont constaté : catalogue 200, accès anonyme 401,
+administration 403 et autre modèle 403. Les résultats de génération synthétique
+sont consignés dans [le rapport daté](validation-2026-10-25.md).
+
+La génération réelle reste **non validée** : refus 400 pour la route statique
+Gemini 3.7 absente du catalogue synchronisé, indisponibilité 503 pour Gemini
+3.1 Flash-Lite, puis refus 404 pour Gemini 2.5 Flash. Après ces essais, la clé
+et le profil restent limités à Gemini 3.1 Flash-Lite. Aucun succès de génération
+n'est déduit du catalogue 200. Seules des phrases synthétiques publiques ont
+été utilisées ; aucun document utilisateur n'a été envoyé. Aucun rafraîchissement
+forcé du catalogue partagé ni changement de compte fournisseur n'a été effectué.
+
+Gemini est ici le fournisseur de **génération**. Le moteur d'embeddings hérité
+n'a pas d'intégration Gemini/OmniRoute ; sans autre fournisseur compatible,
+son mode auto utilise le repli sans embeddings. Les tests pgvector prouvent
+le stockage et les opérations vectorielles, pas la génération d'embeddings.
+Le choix/dimension du modèle d'embeddings reste distinct.
+
+Ce travail ne constitue pas la qualification Kubernetes complète. Celle-ci
+reste soumise aux [conditions de promotion](production-readiness.md), aux
+images publiées et au runner CI isolé actuellement manquant.

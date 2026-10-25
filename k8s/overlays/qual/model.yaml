@@ -3,7 +3,8 @@ kind: ConfigMap
 metadata:
   name: mentor-model-runtime
 data:
-  LLM_PROVIDER: gemini
-  # Stable model documented by Google on 2026-10-25; verify account access
-  # during qualification. No API key, paid request or network grant here.
-  LLM_MODEL: gemini-3.8-flash
+  LLM_PROVIDER: custom
+  # Existing internal Service and Gemini route observed on 2026-10-25.
+  # Credentials belong to OmniRoute; MENTOR receives only its scoped client key.
+  CUSTOM_LLM_BASE_URL: http://omniroute.omniroute.svc.cluster.local/v1
+  CUSTOM_LLM_MODEL: gemini/gemini-3.1-flash-lite

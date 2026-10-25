@@ -1,18 +1,13 @@
 """Gemini HTTP contract and readiness; all requests use an in-memory transport."""
 import json
-from pathlib import Path
 import socket
 
 import httpx
 from openai import AsyncOpenAI
 import pytest
 import pytest_asyncio
-import yaml
 
 from services.llm import readiness, router
-
-ROOT = Path(__file__).resolve().parents[1]
-
 
 @pytest_asyncio.fixture
 async def gemini(monkeypatch):
@@ -20,7 +15,8 @@ async def gemini(monkeypatch):
         raise AssertionError("Gemini unit tests must not use the network")
 
     monkeypatch.setattr(socket, "getaddrinfo", deny_network)
-    configuration = yaml.safe_load((ROOT / "k8s/overlays/qual/model.yaml").read_text())["data"]
+    # Native Google remains supported independently of the OmniRoute qual profile.
+    configuration = {"LLM_PROVIDER": "gemini", "LLM_MODEL": "gemini-3.8-flash"}
     for _, key, *_ in router._OPENAI_COMPAT_PROVIDERS:
         monkeypatch.setattr(router.settings, key, "")
     for key in ("anthropic_api_key", "custom_llm_base_url", "llm_model_large", "llm_model_small",

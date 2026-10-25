@@ -127,14 +127,21 @@ def test_qualification_selects_gemini_without_opening_general_internet_access():
                               text=True, capture_output=True, check=True)
     resources = list(yaml.safe_load_all(rendered.stdout))
     config = next(r for r in resources if r["kind"] == "ConfigMap" and r["metadata"]["name"] == "mentor-model-runtime")
-    assert config["data"] == {"LLM_PROVIDER": "gemini", "LLM_MODEL": "gemini-3.8-flash"}
+    assert config["data"] == {"LLM_PROVIDER": "custom",
+                              "CUSTOM_LLM_BASE_URL": "http://omniroute.omniroute.svc.cluster.local/v1",
+                              "CUSTOM_LLM_MODEL": "gemini/gemini-3.1-flash-lite"}
     api = next(r for r in resources if r["kind"] == "Deployment" and r["metadata"]["name"] == "mentor-api")
     container = api["spec"]["template"]["spec"]["containers"][0]
     env = {e["name"]: e for e in container["env"]}
-    assert env["GEMINI_API_KEY"]["valueFrom"]["secretKeyRef"] == {"name": "mentor-model-credentials", "key": "GEMINI_API_KEY"}
-    assert env["LLM_MODEL"]["valueFrom"]["configMapKeyRef"]["key"] == "LLM_MODEL"
-    assert not any(name.startswith("CUSTOM_LLM_") for name in env)
+    assert env["CUSTOM_LLM_API_KEY"]["valueFrom"]["secretKeyRef"] == {"name": "mentor-model-credentials", "key": "CUSTOM_LLM_API_KEY"}
+    assert env["CUSTOM_LLM_MODEL"]["valueFrom"]["configMapKeyRef"]["key"] == "CUSTOM_LLM_MODEL"
+    assert "GEMINI_API_KEY" not in env
     assert container["readinessProbe"]["timeoutSeconds"] > 5
-    # FQDN-limited egress is an operator prerequisite, not a blanket TCP/443 grant.
+    # The API may call only the internal router; no direct Google/Internet grant.
     policies = [r for r in resources if r["kind"] == "NetworkPolicy"]
     assert not any(port["port"] == 443 for r in policies for rule in r["spec"].get("egress", []) for port in rule.get("ports", []))
+    router = next(r for r in policies if r["metadata"]["name"] == "mentor-omniroute")
+    assert router["spec"]["podSelector"]["matchLabels"] == {"app.kubernetes.io/name": "mentor-api"}
+    assert router["spec"]["egress"] == [{"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "omniroute"}},
+                                              "podSelector": {"matchLabels": {"app": "omniroute"}}}],
+                                        "ports": [{"protocol": "TCP", "port": 20128}]}]

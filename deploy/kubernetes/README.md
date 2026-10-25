@@ -29,9 +29,10 @@ manuelle sont décrits dans le [runbook Argo CD](../argocd/README.md).
 
 Le tunnel `pkubs` répond désormais ; Kubernetes 1.36.3, Argo CD 3.5.1, les
 sélecteurs Traefik/CoreDNS et la classe Longhorn ont été observés en lecture
-seule. Les overlays ajoutent les seules exceptions DNS, Traefik et PostgreSQL
-IONOS recensées. Le profil qual sélectionne Gemini ; aucun accès inférence n'est encore autorisé. Le rendu qual
-prévoit un replica ; le rendu prod reste à zéro et sans exposition HTTP.
+seule. Les overlays ajoutent les exceptions DNS, Traefik, PostgreSQL IONOS et
+OmniRoute recensées. Le profil qual sélectionne Gemini via OmniRoute ; sa sortie
+est limitée au routeur interne. Le rendu qual prévoit un replica ; le rendu
+prod reste à zéro et sans exposition HTTP.
 Aucun de ces rendus n'est appliqué. Voir les
 [conditions de promotion](../../docs/production-readiness.md).
 
@@ -59,16 +60,16 @@ des NetworkPolicies, ni le fonctionnement des images.
   Les tests locaux readonly/non root ne prouvent pas le fonctionnement du PVC.
 - Fournir hors Git `mentor-api-runtime` (`DATABASE_URL` DML, `JWT_SECRET_KEY`,
   `ENCRYPTION_KEY`), `mentor-postgres-migration` (`DATABASE_URL` DDL),
-  `mentor-model-credentials` (`GEMINI_API_KEY` pour qual). La ConfigMap qual
-  `mentor-model-runtime` fournit `LLM_PROVIDER=gemini` et le modèle explicite.
+  `mentor-model-credentials` (`CUSTOM_LLM_API_KEY` OmniRoute pour qual). La ConfigMap qual
+  `mentor-model-runtime` fournit le connecteur custom, l’URL interne et le modèle explicite.
   Référencer les secrets selon la procédure opérateur ; ne pas mettre de
   valeurs dans Git, un ticket ou les sorties de CI.
 - Provisionner une base MENTOR neuve isolée avec vector et deux rôles restreints.
   La baseline figée et sa restauration ont été exercées sur PostgreSQL local ;
   aucune migration ni création de rôle n'a été exécutée sur IONOS.
-- Le choix Gemini est préparé dans le profil qual. Ajouter une sortie
-  contrôlée vers le domaine Google après validation opérateur, sans autoriser
-  tout Internet sur TCP/443. Tester upload, génération, QCM, FSRS et reprise
+- Le profil qual prévoit Gemini via OmniRoute. Son exception réseau vise
+  uniquement le namespace/pod et le port observés du routeur interne. Aucune
+  sortie Google ou Internet n’est ajoutée. Tester upload, génération, QCM, FSRS et reprise
   avec deux comptes, sans exposer le Service privé dans le navigateur.
 - Qualifier HTTPS, connexion, CSRF/CORS, SSE, sauvegarde des uploads,
   observabilité, ressources et retour arrière. L'overlay prod sans ingress et

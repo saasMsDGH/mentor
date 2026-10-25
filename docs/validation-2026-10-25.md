@@ -145,3 +145,52 @@ Sur le commit précédent `1f04a0d`, le
 termine backend, frontend et provenance avec succès. Le contrôle runtime échoue
 explicitement car le runner n'a toujours pas de moteur de conteneurs local.
 Cela ne constitue pas une erreur corrigée ni une qualification distante réussie.
+
+### Accès OmniRoute dédié et routage Gemini interne
+
+À la demande explicite de l'utilisateur, une clé `mentor-qualification` a été
+créée via la gestion locale officielle d'OmniRoute 3.8.50. Elle est stockée
+sans affichage dans `omniroute/mentor-qualification-client` (champ
+`CUSTOM_LLM_API_KEY`), hors Git. Elle n'est pas propagée à un namespace MENTOR.
+Le seul changement Kubernetes vivant de ce lot concerne ce Secret dédié ;
+aucun workload, AppProject, Application, compte fournisseur ou runner n'est
+créé/modifié. La clé expire sept jours après sa création.
+
+La politique relue limite la clé à la connexion Gemini existante, au seul modèle
+`gemini/gemini-3.1-flash-lite`, sans combo ni droit d'administration, scope
+`self:usage`, `noLog=true`, cache bypass et compression désactivée. Le drapeau
+cloud était activé mais aucune destination cloud n'était configurée, vérifié
+avant les mutations ; aucun réglage cloud n'a été modifié.
+
+Contrôles réels constatés : catalogue avec clé **200**, sans clé **401**,
+administration **403**, autre modèle **403**. La génération n'est **pas validée** :
+
+| Route essayée | Résultat constaté |
+|---|---|
+| `gemini/gemini-3.7-flash` | 400 ; route annoncée par le catalogue général mais refusée car absente du catalogue synchronisé |
+| `gemini/gemini-3.1-flash-lite` | 503 ; modèle synchronisé, indisponibilité en amont |
+| `gemini/gemini-2.5-flash` | 404 ; message d'indisponibilité du modèle |
+
+La clé et le profil ont été replacés sur Gemini 3.1 Flash-Lite. Les requêtes
+portaient uniquement sur une phrase synthétique publique et un QCM ; aucun
+document utilisateur n'a été envoyé. Le catalogue partagé n'a pas été forcé
+ou réimporté. Un catalogue 200 n'est pas une preuve de génération réussie.
+
+Le profil qual cible maintenant l'endpoint interne OmniRoute avec sa clé client.
+La sonde custom présente la même authentification Bearer et exige le modèle
+exact. L'exception réseau préparée vise uniquement les pods OmniRoute du
+namespace observé, TCP/20128, sans ouverture Internet directe ; elle n'est pas
+appliquée au cluster.
+
+Validation locale : **1 039 tests backend réussis, 8 ignorés**, couverture
+**49,88 %** ; **40 tests ciblés** OmniRoute/Gemini/Argo réussis. Image API
+reconstruite sans réseau de build ; **5 tests PostgreSQL**, commande de migration
+production, proxy authentifié, refus 503 de l'inférence absente et restauration
+des **34 tables** réussis sur réseau local fermé. Ces essais locaux ne prouvent
+pas un parcours complet MENTOR déployé avec le vrai modèle.
+
+Le [run 40228366724](https://github.com/saasMsDGH/mentor/actions/runs/40228366724)
+sur `31d7971` termine backend, frontend et provenance avec succès ; le runtime
+échoue toujours faute de moteur Docker local. L'inventaire des runners de
+l'organisation est refusé par GitHub (403, droits d'administration runners
+absents). Aucun élargissement des droits GitHub n'a été demandé ou effectué.

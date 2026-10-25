@@ -28,17 +28,23 @@ PR déjà ouvertes ; aucune fusion ni activation de déploiement n'en découle.
   d'infrastructure partagée n'a été tentée.
 - IONOS : PostgreSQL **18.6**, extension disponible **vector 0.8.6**, endpoint
   référencé par `admin/ionos-pgvector` vers `217.160.126.238:5433`. Aucune base
-  `mentor*` listée. Aucun rôle, secret, pare-feu ou service n'a été modifié.
+  `mentor*` listée. Sur IONOS, aucun rôle, secret, pare-feu ou service n'a été modifié.
 - Le dry-run serveur des schémas Namespace/AppProject/Application réussit.
   Les images de cette simulation ont des hashes synthétiques : ce résultat
   ne prouve ni l'accès Git d'Argo, ni un rendu distant, ni un déploiement.
 - Les images locales passent les contrôles non root/lecture seule, proxy et
   authentification. Sans inférence autorisée, la readiness reste **503**.
   Aucune image n'est publiée. Gemini a ensuite été choisi par l'utilisateur :
-  le profil qual prévoit son connecteur natif et `gemini-3.8-flash`, clé via
-  `mentor-model-credentials/GEMINI_API_KEY`. Accès au compte, sortie réseau
-  limitée au domaine Google, TLS PostgreSQL et provisionnement dédié restent
-  à qualifier.
+  le profil qual utilise maintenant OmniRoute interne et la route synchronisée
+  `gemini/gemini-3.1-flash-lite`. Une clé cliente dédiée a été créée à la demande
+  de l’utilisateur et stockée dans `omniroute/mentor-qualification-client` ;
+  sa propagation au futur namespace MENTOR, le TLS PostgreSQL et le
+  provisionnement dédié restent à qualifier.
+- Clé OmniRoute : catalogue autorisé 200, accès anonyme 401, administration et
+  autre modèle 403. La génération synthétique via Gemini 3.1 Flash-Lite renvoie
+  503 ; Gemini 2.5 Flash a renvoyé 404. La génération réelle reste donc **non
+  validée**, même avec un catalogue accessible. Aucun document utilisateur
+  n'a été envoyé et aucun compte fournisseur n'a été modifié.
 - Le run candidat `40223763535` valide 999 tests backend et 6 tests SQLite,
   puis échoue : le runner `org-runner-subst` n'a pas de démon Docker local.
   Le contrôle runtime conserve un échec bloquant explicite tant qu'un moteur

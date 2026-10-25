@@ -67,23 +67,26 @@ l'organisation, sont :
 |---|---|
 | Secret `mentor-postgres-migration` | `DATABASE_URL` du rôle DDL |
 | Secret `mentor-api-runtime` | `DATABASE_URL` DML, `JWT_SECRET_KEY`, `ENCRYPTION_KEY` |
-| Secret `mentor-model-credentials` | `GEMINI_API_KEY` pour le profil qual |
-| ConfigMap `mentor-model-runtime` (fournie par l’overlay qual) | `LLM_PROVIDER=gemini`, `LLM_MODEL=gemini-3.8-flash` |
+| Secret `mentor-model-credentials` | `CUSTOM_LLM_API_KEY` pour le profil qual |
+| ConfigMap `mentor-model-runtime` (fournie par l’overlay qual) | `LLM_PROVIDER=custom`, URL OmniRoute interne et `CUSTOM_LLM_MODEL` |
 
-Le choix utilisateur est **Gemini**. Le profil qual utilise le connecteur natif
-existant, via l'endpoint Google compatible OpenAI, sans nouvelle dépendance.
-Le modèle stable proposé est `gemini-3.8-flash`, explicitement configuré ;
-il reste à vérifier avec le compte prévu. Voir le
-[contrat Gemini](../../docs/gemini-qualification.md). La clé Google n'est pas
-une clé OmniRoute : aucune clé d'une autre application n'est reprise.
+Le choix utilisateur est **Gemini via OmniRoute**. Le profil qual utilise le
+connecteur custom existant et la route `gemini/gemini-3.1-flash-lite`, présente
+dans le catalogue synchronisé de la connexion. L'API reçoit une clé cliente
+OmniRoute limitée, jamais la clé Google gérée par le routeur. Voir le
+[contrat Gemini/OmniRoute](../../docs/gemini-qualification.md).
 
-Les seules sorties actuellement prévues sont DNS et IONOS `/32:5433`.
-**L'accès Google reste bloqué** jusqu'à la préparation d'une sortie contrôlée
-vers `generativelanguage.googleapis.com:443`. Une NetworkPolicy Kubernetes
-standard ne filtre pas par domaine. La capacité FQDN du cluster n'est pas
-établie ; ne pas ajouter `0.0.0.0/0:443` ou figer une résolution DNS éphémère.
-Préparer une solution opérateur compatible avec le réseau existant, puis tester
-accès autorisé et refus. Le profil n'est pas qualifié tant que cela manque.
+L'utilisateur a autorisé la création de la clé dédiée : elle est conservée dans
+`omniroute/mentor-qualification-client`, hors Git, et expire après sept jours.
+Elle n'a pas encore été propagée à `mentor-qual/mentor-model-credentials`,
+namespace MENTOR encore absent. Aucun droit administrateur n'est attribué à
+la clé applicative. Aucun workload MENTOR n'est activé.
+
+L'exception réseau qual est limitée à l'API vers les pods `app=omniroute`
+du namespace `omniroute`, TCP/20128. DNS et IONOS `/32:5433` restent nécessaires.
+Aucune sortie directe vers Google n'est ouverte et les politiques ne sont pas
+appliquées par cette préparation. Les essais depuis les pods MENTOR restent
+à exécuter après autorisation du déploiement.
 
 ## Rendu et simulation, sans création de ressources
 
