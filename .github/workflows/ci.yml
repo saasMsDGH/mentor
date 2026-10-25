@@ -145,6 +145,7 @@ jobs:
         run: |
           test "$(cat docs/upstream/opentutor/UPSTREAM_COMMIT)" = "2d2c003654cfbc90c173c9db6867ae65a65e8313"
           grep -q 'MIT License' LICENSE
+          sha256sum -c apps/web/src/app/fonts/SHA256SUMS
           test -e apps/api/main.py
           test -e apps/web/package.json
           test -e tests/test_fsrs.py
