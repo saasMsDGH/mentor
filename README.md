@@ -41,3 +41,9 @@ Voir [l'architecture](docs/architecture.md), [la feuille de route](docs/roadmap.
 Le code OpenTutor a été importé à la révision figée, avec sa licence MIT et ses sources de tests. Les travaux suivants sont : tests amont, audit de sécurité, migration PostgreSQL, PWA, pipeline documentaire sourcé puis examens. **Ne pas exposer le Docker Compose amont sur un réseau : authentification désactivée et socket Docker monté par défaut.**
 
 Le premier parcours de démonstration sera « Concours d'officier de gendarmerie interne — Préparation 2027 ». Il est **indicatif**, jamais présenté comme référentiel officiel sans source contrôlée.
+
+## Préparation de qualification
+
+Voir la [base Kubernetes inactive](deploy/kubernetes/README.md) et les
+[résultats de validation constatés](docs/validation-2026-10-25.md).
+Cette préparation ne constitue pas une qualification de production.
