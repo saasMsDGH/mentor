@@ -4,6 +4,14 @@ MENTOR est une plateforme d'apprentissage adaptatif, auto-hébergeable et pensé
 
 > **État : import amont effectué sur `feature/import-opentutor`, validation CI en cours.** Le projet n'est pas encore déployable en production et n'a pas encore été sécurisé pour un accès multi-utilisateur. Les fonctionnalités cibles restent à valider individuellement.
 
+## Règle de promotion vers main
+
+`main` représente la version de référence de production. Le premier merge exige
+une qualification Kubernetes réelle du candidat et une validation Argo CD sur
+le commit attendu, ainsi que les tests applicatifs et de persistance. Une CI
+verte ou un rendu Kustomize local ne suffit pas. Voir les
+[conditions de promotion Kubernetes / Argo CD](docs/production-readiness.md).
+
 ## Décision de socle
 
 - **[OpenTutor](https://github.com/zijinz456/OpenTutor)** : base applicative, tuteur, quiz, FSRS/BKT, graphe de maîtrise et planification.
@@ -41,3 +49,9 @@ Voir [l'architecture](docs/architecture.md), [la feuille de route](docs/roadmap.
 Le code OpenTutor a été importé à la révision figée, avec sa licence MIT et ses sources de tests. Les travaux suivants sont : tests amont, audit de sécurité, migration PostgreSQL, PWA, pipeline documentaire sourcé puis examens. **Ne pas exposer le Docker Compose amont sur un réseau : authentification désactivée et socket Docker monté par défaut.**
 
 Le premier parcours de démonstration sera « Concours d'officier de gendarmerie interne — Préparation 2027 ». Il est **indicatif**, jamais présenté comme référentiel officiel sans source contrôlée.
+
+## Préparation de qualification
+
+Voir la [base Kubernetes inactive](deploy/kubernetes/README.md) et les
+[résultats de validation constatés](docs/validation-2026-10-25.md).
+Cette préparation ne constitue pas une qualification de production.

@@ -10,6 +10,7 @@ on:
     paths:
       - .github/workflows/ci.yml
       - apps/**
+      - deploy/kubernetes/**
       - tests/**
       - scripts/**
       - package*.json

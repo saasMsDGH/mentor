@@ -2,6 +2,11 @@
 
 Statut : **backlog initial**, non livré.
 
+**Politique de livraison : `main` représente la production.** Aucun premier
+merge avant qualification réelle Kubernetes et Argo CD du candidat, même si
+P0 est vert. Les critères et preuves attendues sont définis dans
+[production-readiness.md](production-readiness.md).
+
 ## P0 — Baseline OpenTutor et audit (priorité absolue)
 
 - Importer le code depuis le commit OpenTutor gelé ; conserver `LICENSE`, l'attribution et les références au dépôt amont.
@@ -21,7 +26,7 @@ Statut : **backlog initial**, non livré.
 - S3 privé, workers séparés, pipeline CI, métriques et sauvegarde/restauration.
 - Squelette PWA mobile-first permettant navigation, sessions courtes et continuité multi-appareil.
 
-**DoD :** déploiement en qualification sur Kubernetes, redémarrage sans perte, un même utilisateur reprend sa progression sur mobile et PC, accès non autorisé rejeté.
+**DoD :** déploiement en qualification sur Kubernetes, Argo CD `Synced` et `Healthy` sur la révision attendue, migrations PostgreSQL et restauration testées, redémarrage sans perte, un même utilisateur reprend sa progression sur mobile et PC, accès non autorisé rejeté. Cette qualification conditionne le premier merge vers `main`.
 
 ## P2 — Référentiel documentaire fiable (Study Assistant)
 
