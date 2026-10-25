@@ -70,7 +70,14 @@ jobs:
         run: python -m compileall -q apps/api
 
       - name: Run API unit tests
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q --ignore=tests/test_sqlite_mode.py
+
+      - name: Run SQLite application integration tests in a separate process
+        shell: bash
+        run: |
+          # This module relies on an isolated event loop and app lifecycle.
+          # Use a separate pytest process to prevent stale event-loop sharing.
+          python -m pytest tests/test_sqlite_mode.py -q -o addopts=
 
       - name: Validate Alembic revision graph (SQLite skips migrations)
         working-directory: apps/api
