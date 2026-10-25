@@ -33,9 +33,23 @@ Les suites complètes conservent le seuil de couverture existant de 45 %.
 | `feature/kubernetes-qualification-prep` | rendu local Kustomize | 10 ressources, namespace vérifié, aucun serveur contacté |
 
 Deux avertissements Python restent dans les suites complètes, sans échec.
-Le frontend n'a pas été exécuté localement ; les résultats GitHub ci-dessus
-sont ceux des commits initiaux, pas une certification des nouvelles branches.
-Les statuts des nouvelles CI doivent être lus sur leurs commits respectifs.
+Le run intermédiaire [40211559844](https://github.com/saasMsDGH/mentor/actions/runs/40211559844)
+a révélé un échec supplémentaire : `next/font/google` expirait lors du téléchargement
+de Space Grotesk depuis Google Fonts. Le correctif `6da81fa`, reporté sur les
+quatre branches, embarque la police à une révision figée et sa licence OFL 1.1
+(voir `apps/web/src/app/fonts/README.md`). La notice est distribuée dans `public/`
+et les empreintes sont contrôlées en CI.
+
+Après ce correctif, validation frontend locale : **217 tests réussis**, lint
+sans erreur (un avertissement existant dans `timeline-view.tsx`), build Next.js
+et TypeScript réussis avec accès réseau restreint. Les dépendances verrouillées
+ont été installées au préalable ; ce résultat ne prétend pas qu'une installation
+npm à froid fonctionne sans accès au registre.
+
+Les CI corrigées sont déclenchées sur les quatre branches et restent à confirmer
+sur les runners de l'organisation. Les résultats locaux ne remplacent pas leurs
+statuts distants. Le test pédagogique a également été revalidé après interdiction
+explicite des résolutions DNS : 2 réussites.
 
 Commandes utilisées (variables réservées aux tests locaux, pas à un déploiement) :
 
@@ -52,7 +66,8 @@ kubectl kustomize deploy/kubernetes/base
 ## Limites et séparation des responsabilités
 
 Aucune fusion, aucun déploiement, aucune connexion au cluster et aucune base
-PostgreSQL réelle. La licence MIT et le copyright OpenTutor restent présents ;
+PostgreSQL réelle. La licence MIT et le copyright OpenTutor restent présents ; la police
+Space Grotesk ajoute sa propre notice SIL OFL 1.1 conservée ;
 aucun code d'un autre projet de référence n'a été importé. Un audit exhaustif
 des licences des dépendances n'a pas été réalisé.
 
