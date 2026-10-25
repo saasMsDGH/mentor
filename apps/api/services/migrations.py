@@ -27,14 +27,18 @@ class MigrationState:
         return asdict(self)
 
 
-def build_alembic_config() -> Config:
-    config = Config(str(API_DIR / "alembic.ini"))
+def build_alembic_config(database_backend: str | None = None) -> Config:
+    if database_backend is None:
+        from config import settings
+        database_backend = "postgresql" if settings.database_url.startswith("postgresql+") else "sqlite"
+    filename = "alembic-postgres.ini" if database_backend == "postgresql" else "alembic.ini"
+    config = Config(str(API_DIR / filename))
     config.set_main_option("script_location", str(API_DIR / "alembic"))
     return config
 
 
-def get_expected_migration_heads() -> list[str]:
-    script = ScriptDirectory.from_config(build_alembic_config())
+def get_expected_migration_heads(database_backend: str | None = None) -> list[str]:
+    script = ScriptDirectory.from_config(build_alembic_config(database_backend))
     return sorted(script.get_heads())
 
 
@@ -43,6 +47,7 @@ def summarize_migration_state(
     table_names: Collection[str],
     current_heads: Sequence[str],
     expected_heads: Sequence[str],
+    required_tables: Collection[str] = (),
 ) -> MigrationState:
     tables = set(table_names)
     current = sorted(set(current_heads))
@@ -52,6 +57,8 @@ def summarize_migration_state(
 
     if not has_users:
         status = "schema_missing"
+    elif set(required_tables) - tables:
+        status = "schema_incomplete"
     elif not has_version_table:
         status = "version_table_missing"
     elif not current:
@@ -73,6 +80,20 @@ def summarize_migration_state(
 
 
 def inspect_database_migrations(connection) -> MigrationState:
+    if connection.dialect.name != "sqlite":
+        from database import Base
+        tables = set(sa.inspect(connection).get_table_names())
+        current_heads = []
+        if "alembic_version" in tables:
+            current_heads = [str(row[0]) for row in connection.execute(
+                sa.text("SELECT version_num FROM alembic_version")
+            )]
+        return summarize_migration_state(
+            table_names=tables,
+            current_heads=current_heads,
+            expected_heads=get_expected_migration_heads(connection.dialect.name),
+            required_tables=Base.metadata.tables.keys(),
+        )
     # SQLite local mode is migration-ready by design.
     # We bootstrap schema via SQLAlchemy create_all() and do not require Alembic
     # stamping as a runtime blocker for local single-user beta startup.
@@ -96,6 +117,8 @@ def bootstrap_alembic_version_table(connection) -> list[str]:
     can reason about the database consistently.
     """
 
+    if connection.dialect.name != "sqlite":
+        raise RuntimeError("PostgreSQL schemas must be migrated explicitly, never stamped at startup")
     inspector = sa.inspect(connection)
     table_names = set(inspector.get_table_names())
     if "users" not in table_names:

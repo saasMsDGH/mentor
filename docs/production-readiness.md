@@ -10,18 +10,49 @@ PR déjà ouvertes ; aucune fusion ni activation de déploiement n'en découle.
 
 - Les CI des quatre lots de correction/préparation ont réussi sur les runners
   de l'organisation. Les résultats restent attachés à leurs commits testés.
-- La base `deploy/kubernetes/base` est inactive : zéro replica, images non
-  configurées, aucun overlay qual/prod ou manifeste Argo CD MENTOR livré.
-- Les tests PostgreSQL compilent les types et schémas ; ils ne constituent pas
-  une migration exécutée sur PostgreSQL réel.
+- La base historique `deploy/kubernetes/base` reste inactive. Le candidat
+  consolidé ajoute `k8s/overlays/qual` (un replica par service), `prod` (zéro),
+  un Job de migration et un générateur d'Application Argo CD manuelle figée
+  sur SHA et digests. Ces fichiers ne sont pas appliqués.
+- La baseline PostgreSQL complète est exécutée localement sur une base jetable
+  pgvector sans réseau. Le parcours document→QCM→FSRS, le rôle DML et une
+  restauration comparant 34 tables ont réussi. Cela ne qualifie pas IONOS.
 - Le dépôt GitOps `saasMsDGH/admin-platform-gitops` contient les points d'entrée
   `clusters/ovh-qual` et `clusters/ovh-prod`. Aucun fichier MENTOR n'a été repéré
   dans son arbre consulté. Cela ne prouve pas l'absence d'une Application créée
   directement dans un cluster.
-- Le contexte Kubernetes local `pkubs` pointe vers une API locale dont la
-  connexion est refusée lors de la tentative de lecture seule. L'état vivant
-  d'Argo CD et de MENTOR n'est donc **pas établi**. Aucune application n'a été
-  synchronisée ou modifiée.
+- Après rétablissement du tunnel, `pkubs` répond : Kubernetes
+  `v1.36.3+k3s1`, trois nœuds amd64, Argo CD `v3.5.1`. Aucune Application ni
+  namespace MENTOR n'a été trouvé. La racine `admin-platform` est
+  `OutOfSync / Healthy` avec `ExcludedResourceWarning` ; aucune correction
+  d'infrastructure partagée n'a été tentée.
+- IONOS : PostgreSQL **18.6**, extension disponible **vector 0.8.6**, endpoint
+  référencé par `admin/ionos-pgvector` vers `217.160.126.238:5433`. Aucune base
+  `mentor*` listée. Sur IONOS, aucun rôle, secret, pare-feu ou service n'a été modifié.
+- Le dry-run serveur des schémas Namespace/AppProject/Application réussit.
+  Les images de cette simulation ont des hashes synthétiques : ce résultat
+  ne prouve ni l'accès Git d'Argo, ni un rendu distant, ni un déploiement.
+- Les images locales passent les contrôles non root/lecture seule, proxy et
+  authentification. Sans inférence autorisée, la readiness reste **503**.
+  Aucune image n'est publiée. Gemini a ensuite été choisi par l'utilisateur :
+  le profil qual utilise maintenant OmniRoute interne et la route synchronisée
+  `gemini/gemini-3.1-flash-lite`. Une clé cliente dédiée a été créée à la demande
+  de l’utilisateur et stockée dans `omniroute/mentor-qualification-client` ;
+  sa propagation au futur namespace MENTOR, le TLS PostgreSQL et le
+  provisionnement dédié restent à qualifier.
+- Clé OmniRoute : catalogue autorisé 200, accès anonyme 401, administration et
+  autre modèle 403. La génération synthétique via Gemini 3.1 Flash-Lite renvoie
+  503 puis 504 ; Gemini 2.5 Flash a renvoyé 404. La génération réelle reste donc **non
+  validée**, même avec un catalogue accessible. Aucun document utilisateur
+  n'a été envoyé et aucun compte fournisseur n'a été modifié.
+- Le run candidat `40223763535` valide 999 tests backend et 6 tests SQLite,
+  puis échoue : le runner `org-runner-subst` n'a pas de démon Docker local.
+  Le contrôle runtime conserve un échec bloquant explicite tant qu'un moteur
+  de conteneurs CI isolé n'est pas disponible. Il n'est ni ignoré ni remplacé
+  par un succès local.
+- Sur `1f04a0d`, le [run 40224903927](https://github.com/saasMsDGH/mentor/actions/runs/40224903927)
+  termine backend, frontend et provenance avec succès ; seul le contrôle
+  runtime échoue sur le prérequis de moteur de conteneurs isolé.
 - L'API GitHub indique actuellement `protected: false` pour `main`. Les règles
   de promotion ci-dessous sont documentées, pas encore imposées par une règle
   de protection ou un contrôle de qualification automatisé.
@@ -87,6 +118,12 @@ Un simple `argocd app wait --sync --health` ne suffit pas comme preuve : enregis
 également la révision observée et les digests des images exécutées, pour exclure
 un résultat encore sain sur une ancienne version. Ne pas contourner les probes,
 les contrôles de santé ou l'isolation pour obtenir un statut vert.
+
+Le [runbook Argo CD](../deploy/argocd/README.md) décrit le rendu et la collecte
+de preuves. `scripts/verify_argocd_qualification.py` refuse une ancienne
+révision, une opération incomplète, zéro replica et des pods exécutant une
+ancienne image. Ce validateur de captures ne remplace pas les essais métier,
+réseau, HTTPS, stockage et restauration dans le cluster.
 
 ## Gouvernance à mettre en place
 

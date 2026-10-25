@@ -1,0 +1,58 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../deploy/kubernetes/base
+  - migrate.yaml
+  - network-policy.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: mentor
+    includeSelectors: false
+    includeTemplates: true
+patches:
+  # Namespaces and the AppProject are provisioned separately by the operator.
+  - target:
+      kind: Namespace
+      name: mentor-qualification
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: mentor-qualification
+  - target:
+      kind: PersistentVolumeClaim
+      name: mentor-uploads
+    patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: longhorn
+  - target:
+      kind: Deployment
+      name: mentor-web
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/volumeMounts/1/mountPath
+        value: /app/apps/web/.next/cache
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          kubernetes.io/arch: amd64
+  # Bootstrap the account and deny/allow policies before the migration hook.
+  - target:
+      kind: ServiceAccount
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-2"
+  - target:
+      kind: NetworkPolicy
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-2"

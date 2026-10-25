@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
 import database as database_module
@@ -28,7 +29,7 @@ def _default_migration_state() -> MigrationState:
 
 
 def _database_backend() -> str:
-    return "sqlite"
+    return database_module.engine.dialect.name
 
 
 def _local_beta_readiness(
@@ -70,19 +71,23 @@ async def get_liveness() -> dict[str, Any]:
 async def get_readiness() -> dict[str, Any]:
     """Readiness check – verifies DB and LLM are reachable."""
     db_ok = False
+    migration_state = _default_migration_state()
     try:
         async with database_module.async_session() as db:
             await db.execute(text("SELECT 1"))
+            conn = await db.connection()
+            migration_state = await conn.run_sync(inspect_database_migrations)
         db_ok = True
-    except (ConnectionError, TimeoutError, OSError, RuntimeError) as exc:
-        logger.warning("Readiness check: database unreachable: %s", exc)
+    except (SQLAlchemyError, ConnectionError, TimeoutError, OSError, RuntimeError):
+        logger.warning("Readiness check: database or migration state unavailable")
 
     llm_runtime = await get_llm_runtime_status()
-    llm_ok = llm_runtime["status"] not in {"mock_fallback", "configuration_required"}
+    llm_ok = llm_runtime["status"] == "ready"
 
     return {
-        "ready": db_ok and llm_ok,
+        "ready": db_ok and migration_state.schema_ready and llm_ok,
         "database": "connected" if db_ok else "unreachable",
+        "schema": "ready" if migration_state.schema_ready else migration_state.migration_status,
         "llm_status": llm_runtime["status"],
     }
 
@@ -96,8 +101,8 @@ async def get_health_status() -> dict[str, Any]:
             conn = await db.connection()
             migration_state = await conn.run_sync(inspect_database_migrations)
         db_ok = True
-    except (ConnectionError, TimeoutError, OSError, RuntimeError) as exc:
-        logger.exception("Health check: database unreachable: %s", exc)
+    except (SQLAlchemyError, ConnectionError, TimeoutError, OSError, RuntimeError):
+        logger.warning("Health check: database or migration state unavailable")
 
     llm_runtime = await get_llm_runtime_status()
     provider_health = llm_runtime["provider_health"]

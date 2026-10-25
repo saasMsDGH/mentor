@@ -1,0 +1,20 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mentor-web
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`mentor.qual.dgsynthex.online`)
+      kind: Rule
+      middlewares:
+        - name: platform-security-headers
+          namespace: kube-system
+      services:
+        - name: mentor-web
+          port: 3001
+  tls:
+    certResolver: qual-dns
+    domains:
+      - main: qual.dgsynthex.online
+        sans: ['*.qual.dgsynthex.online']

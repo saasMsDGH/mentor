@@ -51,3 +51,6 @@ sessions/
 # Local database
 *.db
 *.sqlite
+
+# Prepared public dependency bundles for offline container builds
+.build/

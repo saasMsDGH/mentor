@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mentor-omniroute
+  annotations:
+    argocd.argoproj.io/sync-wave: '-2'
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mentor-api
+  policyTypes: [Egress]
+  egress:
+    - to:
+        # Namespace AND pod selector, scoped to the observed OmniRoute service.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: omniroute
+          podSelector:
+            matchLabels:
+              app: omniroute
+      ports:
+        # Policies select the destination pod port, not Service port 80.
+        - protocol: TCP
+          port: 20128

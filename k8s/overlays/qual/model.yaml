@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mentor-model-runtime
+data:
+  LLM_PROVIDER: custom
+  # Existing internal Service and Gemini route observed on 2026-10-25.
+  # Credentials belong to OmniRoute; MENTOR receives only its scoped client key.
+  CUSTOM_LLM_BASE_URL: http://omniroute.omniroute.svc.cluster.local/v1
+  CUSTOM_LLM_MODEL: gemini/gemini-3.1-flash-lite

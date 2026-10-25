@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 async def _maybe_create_tables() -> None:
     if not settings.app_auto_create_tables:
         return
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError(
+            "PostgreSQL requires explicit migrations: disable APP_AUTO_CREATE_TABLES "
+            "and run alembic -c alembic-postgres.ini upgrade head before starting the API"
+        )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

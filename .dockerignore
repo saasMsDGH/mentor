@@ -32,7 +32,9 @@ docs/
 .env
 .env.local
 .claude/
-scripts/
+scripts/*
+!scripts/collect-node-licenses.mjs
+!scripts/check-web-build.mjs
 
 # OS
 .DS_Store
@@ -40,3 +42,8 @@ Thumbs.db
 
 # Uploads (runtime data, not build-time)
 uploads/
+
+# Exclude local credentials from every build context.
+**/.env*
+**/*.pem
+**/*.key

@@ -52,6 +52,8 @@ Le premier parcours de démonstration sera « Concours d'officier de gendarmerie
 
 ## Préparation de qualification
 
-Voir la [base Kubernetes inactive](deploy/kubernetes/README.md) et les
+Voir les [overlays Kubernetes](deploy/kubernetes/README.md), le
+[runbook Argo CD manuel](deploy/argocd/README.md), les
+[images de qualification](deploy/images/README.md) et les
 [résultats de validation constatés](docs/validation-2026-10-25.md).
 Cette préparation ne constitue pas une qualification de production.

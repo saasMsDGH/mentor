@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+// Browser traffic uses /api on the same origin. A private server URL must not
+// become a public CSP destination or a NEXT_PUBLIC_* build-time constant.
+const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_URL
+  ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+  : "";
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -17,13 +22,14 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      `connect-src 'self' ${API_URL.replace(/\/api$/, "")}${process.env.NODE_ENV === "development" ? " http://localhost:* ws://localhost:*" : ""}`,
+      `connect-src 'self' ${PUBLIC_API_ORIGIN}${process.env.NODE_ENV === "development" ? " http://localhost:* ws://localhost:*" : ""}`,
       "frame-ancestors 'none'",
     ].join("; "),
   },
 ];
 
 const nextConfig: NextConfig = {
+  output: process.env.NEXT_STANDALONE === "1" ? "standalone" : undefined,
   outputFileTracingRoot: path.join(__dirname, "..", ".."),
   turbopack: {
     root: path.join(__dirname, "..", ".."),

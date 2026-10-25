@@ -11,7 +11,7 @@ Cette branche est une **étape technique**, pas une prise en charge opérationne
 - Dépendances optionnelles isolées dans `apps/api/requirements-postgres.txt`.
 - Tests de compilation des types et de sérialisation SQLite, sans prétendre valider une vraie base PostgreSQL.
 
-## Blocages à résoudre avant activation Kubernetes
+## Blocages identifiés au stade du prototype #9
 
 1. **Schéma initial** : les migrations Alembic amont semblent incrémentales ; il faut établir une migration baseline complète et une stratégie de conversion des données.
 2. **Extension** : `CREATE EXTENSION vector` doit être disponible sur le cluster PostgreSQL, avec droits adaptés.
@@ -20,7 +20,8 @@ Cette branche est une **étape technique**, pas une prise en charge opérationne
 5. **Sécurité** : connexion TLS, secrets et RBAC. Pas d'ouverture réseau automatique.
 6. **Validation** : tests unitaires + intégration réelle dans un PostgreSQL isolé, migration avant/après, contrôle de perte de données, sauvegarde/restauration.
 
-Ne pas fusionner sans les gates ci-dessus et sans vert complet de la baseline OpenTutor.
+Le candidat consolidé ci-dessous traite le schéma neuf et sa validation locale.
+Les garanties de production restent soumises aux conditions de promotion.
 
 ## Validation ajoutée après la PR #9
 
@@ -46,3 +47,52 @@ schéma ORM ne prouve ni son application, ni le fonctionnement des requêtes de
 recherche ou des migrations Alembic. La première révision Alembic vérifie une
 table déjà existante : une baseline complète et figée reste à construire.
 Ne pas remplacer les migrations par `create_all()` dans un déploiement.
+
+## Candidat consolidé : migration PostgreSQL réellement testée
+
+La branche `feature/production-candidate` réunit les lots pédagogie et
+qualification. Elle ajoute un historique Alembic PostgreSQL distinct, figé,
+pour **une base neuve uniquement** :
+
+```sh
+cd apps/api
+alembic -c alembic-postgres.ini upgrade head
+```
+
+L'extension `vector` doit être provisionnée au préalable par l'opérateur de
+base. La migration applicative ne réclame pas de droits superutilisateur.
+La chaîne incrémentale OpenTutor reste conservée dans `alembic.ini` ; elle ne
+sert pas de baseline PostgreSQL. Aucune adoption automatique d'une ancienne
+base PostgreSQL ni conversion des données SQLite n'est fournie par ce lot.
+
+La baseline `mentor_pg_0001` crée les 33 tables ORM, leurs contraintes/index,
+les types UUID/JSONB/TSVECTOR/vector, les index GIN et HNSW. Les scripts restent
+indépendants des modèles futurs. L'API refuse `create_all()` sous PostgreSQL et
+ne tamponne pas un schéma au démarrage. Les probes vérifient les tables
+attendues et la révision Alembic réelle ; un modèle indisponible ou dégradé
+maintient la readiness fermée.
+
+Validation locale reproductible :
+
+```sh
+python -m pip install -r apps/api/requirements-postgres.txt
+python scripts/test_postgres.py
+```
+
+Le contrôleur utilise l'image pgvector/PostgreSQL 18 identifiée par son
+digest dans le script. Il crée un conteneur jetable, sans réseau ni port publié,
+et un socket Unix temporaire. Il génère les mots de passe sans les afficher,
+sépare un rôle de migration et un rôle applicatif DML, exécute les migrations
+aller/retour et les mêmes tests document→QCM→FSRS sur la vraie base.
+Il teste UUID/JSONB/vector, requêtes vectorielles et plein texte, GIN/HNSW,
+readiness et refus d'une révision incomplète. Enfin, un `pg_dump` est restauré
+dans une seconde base jetable : les empreintes et nombres de lignes des
+34 tables, version Alembic comprise, sont comparés. Les données sources sont
+uniquement les fixtures de test, jamais une base existante.
+
+Ces tests ne prouvent pas la restauration des fichiers uploadés ni du stockage
+objet, l'isolation réseau du cluster, une migration de données existantes ou la
+performance d'un corpus réel. Les requêtes RAG héritées utilisent encore leur
+repli générique ; la présence des index ne signifie pas qu'elles les exploitent
+toutes. Le `downgrade base` testé détruit les tables de la base jetable : ce
+n'est pas une procédure de retour arrière autorisée pour une production.
