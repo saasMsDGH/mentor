@@ -168,7 +168,7 @@ administration **403**, autre modèle **403**. La génération n'est **pas valid
 | Route essayée | Résultat constaté |
 |---|---|
 | `gemini/gemini-3.7-flash` | 400 ; route annoncée par le catalogue général mais refusée car absente du catalogue synchronisé |
-| `gemini/gemini-3.1-flash-lite` | 503 ; modèle synchronisé, indisponibilité en amont |
+| `gemini/gemini-3.1-flash-lite` | 503, puis 504 après une nouvelle tentative espacée ; génération non validée |
 | `gemini/gemini-2.5-flash` | 404 ; message d'indisponibilité du modèle |
 
 La clé et le profil ont été replacés sur Gemini 3.1 Flash-Lite. Les requêtes

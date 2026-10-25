@@ -42,7 +42,7 @@ PR déjà ouvertes ; aucune fusion ni activation de déploiement n'en découle.
   provisionnement dédié restent à qualifier.
 - Clé OmniRoute : catalogue autorisé 200, accès anonyme 401, administration et
   autre modèle 403. La génération synthétique via Gemini 3.1 Flash-Lite renvoie
-  503 ; Gemini 2.5 Flash a renvoyé 404. La génération réelle reste donc **non
+  503 puis 504 ; Gemini 2.5 Flash a renvoyé 404. La génération réelle reste donc **non
   validée**, même avec un catalogue accessible. Aucun document utilisateur
   n'a été envoyé et aucun compte fournisseur n'a été modifié.
 - Le run candidat `40223763535` valide 999 tests backend et 6 tests SQLite,

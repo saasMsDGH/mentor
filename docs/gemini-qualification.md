@@ -94,8 +94,8 @@ administration 403 et autre modèle 403. Les résultats de génération synthét
 sont consignés dans [le rapport daté](validation-2026-10-25.md).
 
 La génération réelle reste **non validée** : refus 400 pour la route statique
-Gemini 3.7 absente du catalogue synchronisé, indisponibilité 503 pour Gemini
-3.1 Flash-Lite, puis refus 404 pour Gemini 2.5 Flash. Après ces essais, la clé
+Gemini 3.7 absente du catalogue synchronisé, réponses 503 puis 504 sur le chemin
+Gemini 3.1 Flash-Lite, et refus 404 pour Gemini 2.5 Flash. Après ces essais, la clé
 et le profil restent limités à Gemini 3.1 Flash-Lite. Aucun succès de génération
 n'est déduit du catalogue 200. Seules des phrases synthétiques publiques ont
 été utilisées ; aucun document utilisateur n'a été envoyé. Aucun rafraîchissement
