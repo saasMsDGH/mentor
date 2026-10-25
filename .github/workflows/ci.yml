@@ -6,6 +6,7 @@ on:
       - main
       - 'feature/**'
       - 'fix/**'
+      - 'wip/postgresql-*'
     paths:
       - .github/workflows/ci.yml
       - apps/**
@@ -30,7 +31,9 @@ jobs:
     env:
       DISABLE_RATE_LIMIT: "1"
       CODE_SANDBOX_BACKEND: process
-      ENVIRONMENT: test
+      # Only isolated unit tests: the upstream single-user fixture requires development mode.
+      # NEVER use this setting for a deployed or network-accessible runtime.
+      ENVIRONMENT: development
       DATABASE_URL: sqlite+aiosqlite:////tmp/mentor-ci-tests.db
     steps:
       - name: Verify dedicated self-hosted runner
@@ -49,6 +52,8 @@ jobs:
           cache-dependency-path: |
             apps/api/requirements-core.txt
             apps/api/requirements-full.txt
+            apps/api/requirements-ci.txt
+            apps/api/requirements-postgres.txt
 
       - name: Prepare isolated virtual environment
         shell: bash
@@ -61,14 +66,22 @@ jobs:
       - name: Install test dependencies (lightweight profile)
         shell: bash
         run: |
-          python -m pip install --disable-pip-version-check --no-input -r apps/api/requirements-ci.txt
+          # Validate pgvector processors instead of silently skipping them.
+          python -m pip install --disable-pip-version-check --no-input -r apps/api/requirements-postgres.txt
           python -m pip check
 
       - name: Compile API sources
         run: python -m compileall -q apps/api
 
       - name: Run API unit tests
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q --ignore=tests/test_sqlite_mode.py --timeout=60
+
+      - name: Run SQLite application integration tests in a separate process
+        shell: bash
+        run: |
+          # This module relies on an isolated event loop and app lifecycle.
+          # Use a separate pytest process to prevent stale event-loop sharing.
+          python -m pytest tests/test_sqlite_mode.py -q -o addopts= --timeout=60
 
       - name: Validate Alembic revision graph (SQLite skips migrations)
         working-directory: apps/api
@@ -131,6 +144,7 @@ jobs:
         run: |
           test "$(cat docs/upstream/opentutor/UPSTREAM_COMMIT)" = "2d2c003654cfbc90c173c9db6867ae65a65e8313"
           grep -q 'MIT License' LICENSE
+          sha256sum -c apps/web/src/app/fonts/SHA256SUMS
           test -e apps/api/main.py
           test -e apps/web/package.json
           test -e tests/test_fsrs.py

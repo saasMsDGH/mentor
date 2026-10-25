@@ -9,6 +9,7 @@ be validated against a real PostgreSQL instance separately.
 """
 
 import json as _json
+import math as _math
 import uuid as _uuid
 
 from sqlalchemy import JSON, String, Text
@@ -72,7 +73,16 @@ class _VectorType(TypeDecorator):
             return None
         if dialect.name == "postgresql":
             # Native pgvector bindings must receive numeric values, not JSON text.
-            return _json.loads(value) if isinstance(value, str) else value
+            values = _json.loads(value) if isinstance(value, str) else value
+            try:
+                if len(values) != self.dim:
+                    raise ValueError(f"Expected {self.dim} vector dimensions")
+                values = [float(item) for item in values]
+            except (TypeError, OverflowError) as exc:
+                raise ValueError("Vector must be a flat numeric sequence") from exc
+            if not all(_math.isfinite(item) for item in values):
+                raise ValueError("Vector values must be finite")
+            return values
         return value if isinstance(value, str) else _json.dumps(value)
 
     def process_result_value(self, value, dialect):

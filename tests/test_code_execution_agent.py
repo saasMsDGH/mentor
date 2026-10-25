@@ -1,13 +1,21 @@
+from unittest.mock import patch
+
 from services.agent.code_execution import CodeExecutionAgent
 
 
-def test_code_execution_uses_subprocess_sandbox_for_basic_code():
+def test_code_execution_delegates_to_process_backend_when_allowed():
     agent = CodeExecutionAgent()
     from services.agent.code_execution import pop_sandbox_backend_override, push_sandbox_backend_override
 
     token = push_sandbox_backend_override("process")
     try:
-        result = agent._execute_safe("print(sum([1, 2, 3]))")
+        # The CI runner also has k8s-deploy rights. Never execute Python
+        # snippets in its host process; check dispatch via a mocked backend.
+        with patch.object(agent, "_execute_in_process_sandbox", return_value={
+            "success": True, "output": "6", "error": "", "backend": "process"
+        }) as execution:
+            result = agent._execute_safe("print(sum([1, 2, 3]))")
+            execution.assert_called_once_with("print(sum([1, 2, 3]))")
     finally:
         pop_sandbox_backend_override(token)
 
