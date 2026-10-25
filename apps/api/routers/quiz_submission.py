@@ -15,6 +15,7 @@ from models.practice import PracticeProblem, PracticeResult
 from models.user import User
 from schemas.quiz import (
     AnswerResponse,
+    DueReviewProblemResponse,
     MasterySnapshotResponse,
     ProblemResponse,
     SubmitAnswerRequest,
@@ -26,6 +27,45 @@ from sqlalchemy.exc import SQLAlchemyError
 from libs.exceptions import NotFoundError
 
 router = APIRouter()
+
+
+@router.get("/{course_id}/due-review", response_model=list[DueReviewProblemResponse],
+            summary="List due quiz reviews",
+            description="Return active questions for content nodes whose FSRS review is due, oldest first.")
+async def list_due_reviews(
+    course_id: uuid.UUID,
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from libs.datetime_utils import utcnow
+    from models.progress import LearningProgress
+
+    await get_course_or_404(db, course_id, user_id=user.id)
+    result = await db.execute(
+        select(PracticeProblem, LearningProgress.next_review_at)
+        .join(LearningProgress, (
+            (LearningProgress.content_node_id == PracticeProblem.content_node_id)
+            & (LearningProgress.course_id == PracticeProblem.course_id)
+        ))
+        .where(
+            PracticeProblem.course_id == course_id,
+            PracticeProblem.is_archived.is_(False),
+            PracticeProblem.is_diagnostic.is_(False),
+            LearningProgress.user_id == user.id,
+            LearningProgress.next_review_at <= utcnow(),
+        )
+        .order_by(LearningProgress.next_review_at, PracticeProblem.order_index, PracticeProblem.id)
+        .limit(limit)
+    )
+    return [
+        DueReviewProblemResponse(
+            **ProblemResponse.model_validate(problem).model_dump(),
+            content_node_id=problem.content_node_id,
+            next_review_at=due,
+        )
+        for problem, due in result.all()
+    ]
 
 
 @router.get("/{course_id}", response_model=list[ProblemResponse], summary="List practice problems", description="Return paginated practice problems for a course, excluding diagnostics.")

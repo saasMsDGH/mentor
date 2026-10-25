@@ -72,6 +72,11 @@ class PrerequisiteGap(BaseModel):
     gap_severity: float
 
 
+class DueReviewProblemResponse(ProblemResponse):
+    content_node_id: uuid.UUID
+    next_review_at: datetime
+
+
 class AnswerResponse(BaseModel):
     is_correct: bool
     correct_answer: str | None
