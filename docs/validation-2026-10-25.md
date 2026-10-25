@@ -46,9 +46,17 @@ et TypeScript réussis avec accès réseau restreint. Les dépendances verrouill
 ont été installées au préalable ; ce résultat ne prétend pas qu'une installation
 npm à froid fonctionne sans accès au registre.
 
-Les CI corrigées sont déclenchées sur les quatre branches et restent à confirmer
-sur les runners de l'organisation. Les résultats locaux ne remplacent pas leurs
-statuts distants. Le test pédagogique a également été revalidé après interdiction
+Lors du contrôle distant ultérieur du 25 octobre, les quatre exécutions corrigées
+sont terminées avec le résultat `success` :
+
+- socle : [40212485194](https://github.com/saasMsDGH/mentor/actions/runs/40212485194), commit `6da81fa` ;
+- boucle pédagogique : [40212496352](https://github.com/saasMsDGH/mentor/actions/runs/40212496352), commit `a67ea27` ;
+- dialecte PostgreSQL : [40212498463](https://github.com/saasMsDGH/mentor/actions/runs/40212498463), commit `d436bbd` ;
+- préparation Kubernetes : [40212500437](https://github.com/saasMsDGH/mentor/actions/runs/40212500437), commit `807eb47`.
+
+Ces résultats concernent les commits cités, pas une qualification Kubernetes ou
+Argo CD. Les changements documentaires ultérieurs ne constituent pas une
+validation de déploiement. Le test pédagogique a également été revalidé après interdiction
 explicite des résolutions DNS : 2 réussites.
 
 Commandes utilisées (variables réservées aux tests locaux, pas à un déploiement) :

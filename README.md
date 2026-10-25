@@ -4,6 +4,14 @@ MENTOR est une plateforme d'apprentissage adaptatif, auto-hébergeable et pensé
 
 > **État : import amont effectué sur `feature/import-opentutor`, validation CI en cours.** Le projet n'est pas encore déployable en production et n'a pas encore été sécurisé pour un accès multi-utilisateur. Les fonctionnalités cibles restent à valider individuellement.
 
+## Règle de promotion vers main
+
+`main` représente la version de référence de production. Le premier merge exige
+une qualification Kubernetes réelle du candidat et une validation Argo CD sur
+le commit attendu, ainsi que les tests applicatifs et de persistance. Une CI
+verte ou un rendu Kustomize local ne suffit pas. Voir les
+[conditions de promotion Kubernetes / Argo CD](docs/production-readiness.md).
+
 ## Décision de socle
 
 - **[OpenTutor](https://github.com/zijinz456/OpenTutor)** : base applicative, tuteur, quiz, FSRS/BKT, graphe de maîtrise et planification.

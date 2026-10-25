@@ -18,6 +18,19 @@ des destinations réelles. L'application n'a aucun montage de socket Docker ;
 l'exécution de code par conteneur doit échouer sans runtime disponible, jamais
 basculer vers un processus non isolé.
 
+## Promotion et Argo CD
+
+Cette préparation ne satisfait pas encore la règle `main = production`.
+L'absence de configuration Argo CD dans MENTOR et les replicas à zéro restent
+des blocages, même avec une CI verte. Voir les
+[conditions de promotion](../../docs/production-readiness.md).
+
+Les conventions existantes de l'organisation imposent des overlays qual/prod
+et les namespaces `mentor-qual` / `mentor-prod`. Le namespace historique
+`mentor-qualification` de cette base inactive devra être adapté dans ce travail ;
+il ne désigne pas un environnement MENTOR déjà déployé. Aucun renommage de
+ressource vivante n'est réalisé ici.
+
 ## Vérifications hors cluster
 
 Avec les dépendances de `apps/api/requirements-ci.txt` :
