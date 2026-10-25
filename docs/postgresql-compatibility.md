@@ -21,3 +21,28 @@ Cette branche est une **étape technique**, pas une prise en charge opérationne
 6. **Validation** : tests unitaires + intégration réelle dans un PostgreSQL isolé, migration avant/après, contrôle de perte de données, sauvegarde/restauration.
 
 Ne pas fusionner sans les gates ci-dessus et sans vert complet de la baseline OpenTutor.
+
+## Validation ajoutée après la PR #9
+
+La branche `fix/postgresql-validation` reprend les corrections de tests du socle
+sans fusionner les PR. Le filtre de branches CI couvre désormais aussi
+`wip/postgresql-*`. La CI installe le profil PostgreSQL afin que les assertions
+pgvector ne soient plus ignorées faute de dépendance.
+
+Les tests compilent toutes les tables et tous les index ORM pour le dialecte
+PostgreSQL, puis exercent les véritables processeurs de paramètres/résultats
+SQLAlchemy de pgvector. Le type MENTOR vérifie explicitement dimension et
+valeurs finies avant l'envoi à PostgreSQL ; la sérialisation SQLite historique
+est conservée. Ce contrôle ne dépend pas d'une validation implicite du pilote.
+
+```sh
+python -m pip install -r apps/api/requirements-postgres.txt
+ENVIRONMENT=development DATABASE_URL=sqlite+aiosqlite:////tmp/mentor-tests.db \
+python -m pytest tests/test_postgres_dialect.py -q -o addopts= --timeout=30
+```
+
+**Aucune base PostgreSQL réelle n'est contactée par ces tests.** Compiler un
+schéma ORM ne prouve ni son application, ni le fonctionnement des requêtes de
+recherche ou des migrations Alembic. La première révision Alembic vérifie une
+table déjà existante : une baseline complète et figée reste à construire.
+Ne pas remplacer les migrations par `create_all()` dans un déploiement.

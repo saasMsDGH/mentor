@@ -6,6 +6,7 @@ on:
       - main
       - 'feature/**'
       - 'fix/**'
+      - 'wip/postgresql-*'
     paths:
       - .github/workflows/ci.yml
       - apps/**
@@ -51,6 +52,8 @@ jobs:
           cache-dependency-path: |
             apps/api/requirements-core.txt
             apps/api/requirements-full.txt
+            apps/api/requirements-ci.txt
+            apps/api/requirements-postgres.txt
 
       - name: Prepare isolated virtual environment
         shell: bash
@@ -63,21 +66,22 @@ jobs:
       - name: Install test dependencies (lightweight profile)
         shell: bash
         run: |
-          python -m pip install --disable-pip-version-check --no-input -r apps/api/requirements-ci.txt
+          # Validate pgvector processors instead of silently skipping them.
+          python -m pip install --disable-pip-version-check --no-input -r apps/api/requirements-postgres.txt
           python -m pip check
 
       - name: Compile API sources
         run: python -m compileall -q apps/api
 
       - name: Run API unit tests
-        run: python -m pytest tests/ -q --ignore=tests/test_sqlite_mode.py
+        run: python -m pytest tests/ -q --ignore=tests/test_sqlite_mode.py --timeout=60
 
       - name: Run SQLite application integration tests in a separate process
         shell: bash
         run: |
           # This module relies on an isolated event loop and app lifecycle.
           # Use a separate pytest process to prevent stale event-loop sharing.
-          python -m pytest tests/test_sqlite_mode.py -q -o addopts=
+          python -m pytest tests/test_sqlite_mode.py -q -o addopts= --timeout=60
 
       - name: Validate Alembic revision graph (SQLite skips migrations)
         working-directory: apps/api
