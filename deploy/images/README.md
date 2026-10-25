@@ -65,6 +65,11 @@ vérifie le proxy, le refus d'accès anonyme, le schéma migré et les notices. 
 serveur d'inférence n'est autorisé dans cette fixture : une readiness 503 est
 **attendue** et ne prouve pas une qualification fonctionnelle du modèle.
 
+Le contrôleur exécute aussi la commande exacte du Job Alembic dans l'image
+production, avec uniquement le DSN DDL éphémère, sans JWT ni clé de chiffrement.
+La CI garde ce contrôle obligatoire : l'absence de démon local sur le runner
+actuel bloque la qualification runtime. Voir le [runbook Argo CD](../argocd/README.md).
+
 Les tags `qualification-work` servent seulement à la validation locale. Une
 release doit être reconstruite à partir d'un commit figé, publiée dans un
 registre autorisé et référencée par les digests réellement publiés. Aucune image

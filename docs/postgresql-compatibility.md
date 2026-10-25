@@ -11,7 +11,7 @@ Cette branche est une **étape technique**, pas une prise en charge opérationne
 - Dépendances optionnelles isolées dans `apps/api/requirements-postgres.txt`.
 - Tests de compilation des types et de sérialisation SQLite, sans prétendre valider une vraie base PostgreSQL.
 
-## Blocages à résoudre avant activation Kubernetes
+## Blocages identifiés au stade du prototype #9
 
 1. **Schéma initial** : les migrations Alembic amont semblent incrémentales ; il faut établir une migration baseline complète et une stratégie de conversion des données.
 2. **Extension** : `CREATE EXTENSION vector` doit être disponible sur le cluster PostgreSQL, avec droits adaptés.
@@ -20,7 +20,8 @@ Cette branche est une **étape technique**, pas une prise en charge opérationne
 5. **Sécurité** : connexion TLS, secrets et RBAC. Pas d'ouverture réseau automatique.
 6. **Validation** : tests unitaires + intégration réelle dans un PostgreSQL isolé, migration avant/après, contrôle de perte de données, sauvegarde/restauration.
 
-Ne pas fusionner sans les gates ci-dessus et sans vert complet de la baseline OpenTutor.
+Le candidat consolidé ci-dessous traite le schéma neuf et sa validation locale.
+Les garanties de production restent soumises aux conditions de promotion.
 
 ## Validation ajoutée après la PR #9
 
@@ -78,7 +79,7 @@ python -m pip install -r apps/api/requirements-postgres.txt
 python scripts/test_postgres.py
 ```
 
-Le contrôleur utilise l'image pgvector/PostgreSQL 18.4 déjà identifiée par son
+Le contrôleur utilise l'image pgvector/PostgreSQL 18 identifiée par son
 digest dans le script. Il crée un conteneur jetable, sans réseau ni port publié,
 et un socket Unix temporaire. Il génère les mots de passe sans les afficher,
 sépare un rôle de migration et un rôle applicatif DML, exécute les migrations

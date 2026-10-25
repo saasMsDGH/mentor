@@ -102,6 +102,19 @@ ALTER DEFAULT PRIVILEGES FOR ROLE mentor_migrate IN SCHEMA public GRANT USAGE, S
             if result.returncode == 0 and not args.command:
                 api_image = os.environ.get("MENTOR_API_TEST_IMAGE")
                 if api_image:
+                    # Exercise the exact Kubernetes migration command in the
+                    # production image with only its DDL account, no JWT or
+                    # encryption key and no application create_all().
+                    migration_environment = {**os.environ, "DATABASE_URL":
+                        f"postgresql+asyncpg://mentor_migrate:{migration_password}@/mentor_test?host=%2Fvar%2Frun%2Fpostgresql"}
+                    docker("run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL",
+                           "--security-opt", "no-new-privileges", "--memory", "512m", "--cpus", "1", "--pids-limit", "128",
+                           "--tmpfs", "/tmp:rw,size=32m",
+                           "--mount", f"type=bind,source={socket_dir},target=/var/run/postgresql,readonly",
+                           "--env", "DATABASE_URL", api_image,
+                           "alembic", "-c", "alembic-postgres.ini", "upgrade", "head",
+                           env=migration_environment)
+                    print("Production migration command verified with DDL credentials only", flush=True)
                     api_name = name + "-api"
                     api_environment = {**os.environ,
                                        "DATABASE_URL": f"postgresql+asyncpg://mentor_runtime:{runtime_password}@/mentor_test?host=%2Fvar%2Frun%2Fpostgresql",

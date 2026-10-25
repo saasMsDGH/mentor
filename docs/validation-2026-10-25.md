@@ -71,7 +71,7 @@ CODE_SANDBOX_BACKEND=process python -m pytest tests/test_sqlite_mode.py \
 kubectl kustomize deploy/kubernetes/base
 ```
 
-## Limites et séparation des responsabilités
+## Limites des quatre lots initiaux
 
 Aucune fusion, aucun déploiement, aucune connexion au cluster et aucune base
 PostgreSQL réelle. La licence MIT et le copyright OpenTutor restent présents ; la police
@@ -88,3 +88,34 @@ l'isolation effective d'un cluster sans validation du CNI.
 Séparer les runners CI éphémères sans droits cluster des runners de déploiement
 protégés. Le label `k8s-deploy` est conservé dans ces branches conformément au
 runner actuellement disponible ; aucun réglage de l'organisation n'a été modifié.
+
+## Candidat consolidé #15 et accès rétablis
+
+Ces observations ultérieures remplacent les limites d'accès et de PostgreSQL
+des lots initiaux, sans constituer une qualification du déploiement :
+
+- `a9a763f`, [run 40223763535](https://github.com/saasMsDGH/mentor/actions/runs/40223763535) :
+  **999 tests backend réussis, 8 ignorés**, couverture **49,71 %** ;
+  **6 tests SQLite réussis**. L'étape PostgreSQL Docker échoue car
+  `/var/run/docker.sock` n'existe pas sur `org-runner-subst`.
+- Sur ce même run, **221 tests frontend**, lint et build réussissent, ainsi
+  que le contrôle de provenance. Le job images est ignoré par dépendance au
+  backend en échec ; il n'a pas validé les images à distance.
+- Après ajout des contrats Argo CD, suite backend locale finale :
+  **1 018 réussis, 8 ignorés**, couverture **49,71 %**.
+- Localement : **5 tests PostgreSQL réels réussis**, migration/downgrade/
+  réapplication, types et index, parcours pédagogique avec IA simulée et
+  restauration comparant les données des **34 tables**.
+- Images API/web construites sans réseau de build ; essai sur réseau interne
+  sans port publié, racines en lecture seule, identités non root, proxy même
+  origine, accès anonyme refusé et notices distribuées vérifiés. Readiness
+  **503 attendue** en l'absence de modèle autorisé.
+- Accès `pkubs` et SSH IONOS rétablis en lecture seule. Versions et blocages
+  vivants consignés dans [production-readiness](production-readiness.md).
+- Contrats Argo CD locaux : **19 tests réussis**, dont rejet des preuves de
+  rollout périmées/incomplètes et rendu des overlays qual/prod. Dry-run
+  serveur Namespace/AppProject/Application accepté, sans ressources créées.
+
+Aucune fusion, publication d'image, synchronisation Argo CD ni modification
+de base distante n'a été effectuée. Les résultats locaux ne rendent pas verte
+la qualification runtime distante bloquée par le runner.

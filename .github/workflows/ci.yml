@@ -11,6 +11,9 @@ on:
       - .github/workflows/ci.yml
       - apps/**
       - deploy/kubernetes/**
+      - deploy/argocd/**
+      - deploy/images/**
+      - k8s/**
       - tests/**
       - scripts/**
       - package*.json
@@ -76,6 +79,16 @@ jobs:
       - name: Compile API sources
         run: python -m compileall -q apps/api
 
+      - name: Install checksum-pinned manifest renderer
+        shell: bash
+        run: |
+          test "$(uname -m)" = x86_64
+          mkdir -p "$RUNNER_TEMP/mentor-tools"
+          curl --fail --silent --show-error --location https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl -o "$RUNNER_TEMP/mentor-tools/kubectl"
+          echo "ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336  $RUNNER_TEMP/mentor-tools/kubectl" | sha256sum --check
+          chmod 755 "$RUNNER_TEMP/mentor-tools/kubectl"
+          echo "$RUNNER_TEMP/mentor-tools" >> "$GITHUB_PATH"
+
       - name: Run API unit tests
         run: python -m pytest tests/ -q --ignore=tests/test_sqlite_mode.py --timeout=60
 
@@ -85,12 +98,6 @@ jobs:
           # This module relies on an isolated event loop and app lifecycle.
           # Use a separate pytest process to prevent stale event-loop sharing.
           python -m pytest tests/test_sqlite_mode.py -q -o addopts= --timeout=60
-
-      - name: Validate real PostgreSQL migrations, learning journey and restore
-        shell: bash
-        run: |
-          docker --host unix:///var/run/docker.sock pull pgvector/pgvector@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
-          python scripts/test_postgres.py
 
       - name: Validate Alembic revision graph (SQLite skips migrations)
         working-directory: apps/api
@@ -176,6 +183,13 @@ jobs:
       MENTOR_API_TEST_IMAGE: mentor-api:ci-${{ github.run_id }}-${{ github.run_attempt }}
       MENTOR_WEB_TEST_IMAGE: mentor-web:ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Require an isolated local container engine
+        shell: bash
+        run: |
+          if ! docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then
+            echo '::error::Runtime qualification requires an isolated CI container engine. The current k8s-deploy runner has no local Docker daemon. Provision a separate CI runner with the requested self-hosted/k8s-deploy labels; do not mount a deployment host socket or skip this check.'
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -202,7 +216,9 @@ jobs:
           docker --host unix:///var/run/docker.sock build --network none --build-arg SOURCE_REVISION="$GITHUB_SHA" -f deploy/images/api.Dockerfile -t "$MENTOR_API_TEST_IMAGE" .
           docker --host unix:///var/run/docker.sock build --network none --build-arg SOURCE_REVISION="$GITHUB_SHA" -f deploy/images/web.Dockerfile -t "$MENTOR_WEB_TEST_IMAGE" .
       - name: Test isolated images and database restore
-        run: python scripts/test_postgres.py
+        run: |
+          docker --host unix:///var/run/docker.sock pull pgvector/pgvector@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
+          python scripts/test_postgres.py
       - name: Remove only this run's temporary image tags
         if: always()
         run: |

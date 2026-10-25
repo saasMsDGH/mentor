@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mentor
+  namespace: argocd
+spec:
+  description: MENTOR only; qualification and production destinations are explicit.
+  sourceRepos:
+    - https://github.com/saasMsDGH/mentor.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: mentor-qual
+    - server: https://kubernetes.default.svc
+      namespace: mentor-prod
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: traefik.io
+      kind: IngressRoute

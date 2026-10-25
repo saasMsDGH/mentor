@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mentor-prod
+resources:
+  - ../../base
+# Production stays inactive until qualification, published digests and approved
+# production ingress/model settings are committed. No qualification host reused.
+replicas:
+  - name: mentor-api
+    count: 0
+  - name: mentor-web
+    count: 0

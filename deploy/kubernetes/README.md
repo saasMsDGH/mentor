@@ -1,9 +1,9 @@
 # Base de qualification Kubernetes — inactive
 
-Cette base Kustomize est une proposition à revoir, sans cible cluster connue.
+Cette base Kustomize est une proposition à revoir, conservée comme socle inactif.
 Les deux Deployments restent à **zéro replica** et utilisent des noms d'images
-non configurées. Aucun Ingress, Secret, Job de migration, worker, base de données
-ou déploiement automatique n'est fourni. Aucun manifeste n'a été appliqué.
+non configurées. Cette base seule ne fournit aucun Ingress, Secret, Job de migration, worker
+ou déploiement automatique. Les compléments du candidat sont dans `k8s/`. Aucun manifeste n'a été appliqué.
 
 Elle prépare : namespace à politique de pods `restricted`, compte de service
 sans jeton API, conteneurs non root, filesystem en lecture seule, capacités
@@ -21,15 +21,19 @@ basculer vers un processus non isolé.
 ## Promotion et Argo CD
 
 Cette préparation ne satisfait pas encore la règle `main = production`.
-L'absence de configuration Argo CD dans MENTOR et les replicas à zéro restent
-des blocages, même avec une CI verte. Voir les
-[conditions de promotion](../../docs/production-readiness.md).
+Le candidat consolidé ajoute `k8s/base` et `k8s/overlays/qual|prod`, conformément
+aux conventions de l'organisation. Il conserve cette base historique, supprime
+son Namespace du rendu applicatif et cible `mentor-qual` / `mentor-prod`.
+Le projet Argo CD, les namespaces administrés séparément et l'Application
+manuelle sont décrits dans le [runbook Argo CD](../argocd/README.md).
 
-Les conventions existantes de l'organisation imposent des overlays qual/prod
-et les namespaces `mentor-qual` / `mentor-prod`. Le namespace historique
-`mentor-qualification` de cette base inactive devra être adapté dans ce travail ;
-il ne désigne pas un environnement MENTOR déjà déployé. Aucun renommage de
-ressource vivante n'est réalisé ici.
+Le tunnel `pkubs` répond désormais ; Kubernetes 1.36.3, Argo CD 3.5.1, les
+sélecteurs Traefik/CoreDNS et la classe Longhorn ont été observés en lecture
+seule. Les overlays ajoutent les seules exceptions DNS, Traefik et PostgreSQL
+IONOS recensées. Aucun accès inférence n'est encore autorisé. Le rendu qual
+prévoit un replica ; le rendu prod reste à zéro et sans exposition HTTP.
+Aucun de ces rendus n'est appliqué. Voir les
+[conditions de promotion](../../docs/production-readiness.md).
 
 ## Vérifications hors cluster
 
@@ -45,40 +49,29 @@ Le rendu Kustomize est local et ne contacte pas le cluster. Ces contrôles ne
 valident ni un schéma contre un serveur Kubernetes, ni l'application effective
 des NetworkPolicies, ni le fonctionnement des images.
 
-## Conditions pour un futur overlay opérateur
+## Prérequis restant à qualifier
 
-- Identifier la version Kubernetes, le CNI et sa prise en charge des politiques,
-  les classes de stockage, le contrôleur Ingress et les sélecteurs DNS réels.
-  Aucune adresse de cluster, de base, de modèle ou de domaine n'est présumée.
-- Construire et analyser les images, conserver la licence MIT et les notices
-  amont ; sélectionner des digests immuables. Valider UID, permissions du PVC,
-  chemins écrits, cache tokenizer et démarrage avec racine en lecture seule.
-  Le Dockerfile API amont installe encore le CLI Docker : une image de
-  qualification réduite et sans dépendance à un démon reste à produire.
-- Fournir hors Git le Secret `mentor-api-runtime` avec `DATABASE_URL`,
-  `JWT_SECRET_KEY` et `ENCRYPTION_KEY`, ainsi que la ConfigMap
-  `mentor-model-runtime` avec les champs existants `LLM_PROVIDER`,
-  `CUSTOM_LLM_BASE_URL`, `CUSTOM_LLM_MODEL`. Le fournisseur custom est prévu
-  pour un endpoint autorisé compatible OpenAI ; une éventuelle clé fournisseur
-  doit elle aussi être injectée par référence à un secret, jamais en clair.
-  Configurer TLS PostgreSQL, origines CORS exactes et authentification du modèle
-  selon l'infrastructure autorisée.
-- Définir des exceptions réseau minimales pour DNS, PostgreSQL et inférence
-  autorisée. Ne pas ajouter de sortie générale vers Internet. Vérifier les
-  refus depuis les pods et l'impossibilité d'accéder aux documents d'un autre
-  utilisateur. Les conteneurs d'init, sidecars, workers et migrations doivent
-  recevoir leurs propres permissions et exceptions revues.
-- Produire une baseline Alembic réelle, tester migration, rollback adapté,
-  réconciliation et restauration. La PR #9 est un prototype de dialecte et ne
-  fournit pas encore cette garantie. Ne pas activer `APP_AUTO_CREATE_TABLES`.
-- Résoudre les URL Next.js compilées : `NEXT_PUBLIC_API_URL` est utilisé par
-  le navigateur et les rewrites serveur. Une URL Kubernetes privée ne doit pas
-  être exposée comme endpoint navigateur. Qualifier le routage même origine,
-  SSE, connexion, CSRF et HTTPS avant toute exposition. Aucun domaine n'est
-  inventé ici ; aucun Ingress permissif n'est fourni.
-- Préparer stockage objet privé, travailleurs, observabilité et sauvegardes
-  avant d'augmenter les replicas. La base inactive n'est pas une application
-  Kubernetes opérationnelle et ne justifie aucune promotion de M0/M1.
+- Vérifier l'application effective des NetworkPolicies par le CNI, les refus
+  réseau et l'accès TLS PostgreSQL. L'adresse IONOS est limitée à un `/32`
+  TCP/5433 ; ce manifeste ne change aucun pare-feu ni tunnel existant.
+- Publier après autorisation les images réduites de `deploy/images`, par digest,
+  et valider les permissions du PVC Longhorn, son redémarrage et sa restauration.
+  Les tests locaux readonly/non root ne prouvent pas le fonctionnement du PVC.
+- Fournir hors Git `mentor-api-runtime` (`DATABASE_URL` DML, `JWT_SECRET_KEY`,
+  `ENCRYPTION_KEY`), `mentor-postgres-migration` (`DATABASE_URL` DDL),
+  `mentor-model-credentials` (`CUSTOM_LLM_API_KEY`) et la ConfigMap
+  `mentor-model-runtime` (`LLM_PROVIDER`, `CUSTOM_LLM_BASE_URL`, `CUSTOM_LLM_MODEL`).
+  Référencer les secrets selon la procédure opérateur ; ne pas mettre de
+  valeurs dans Git, un ticket ou les sorties de CI.
+- Provisionner une base MENTOR neuve isolée avec vector et deux rôles restreints.
+  La baseline figée et sa restauration ont été exercées sur PostgreSQL local ;
+  aucune migration ni création de rôle n'a été exécutée sur IONOS.
+- Sélectionner l'endpoint et le modèle autorisés, puis ajouter leur seule sortie
+  réseau. Tester upload, génération, QCM, FSRS et reprise avec deux comptes,
+  sans exposer le Service privé dans le navigateur.
+- Qualifier HTTPS, connexion, CSRF/CORS, SSE, sauvegarde des uploads,
+  observabilité, ressources et retour arrière. L'overlay prod sans ingress et
+  à zéro replica est un emplacement réservé, pas une production prête.
 
 ## Runners
 
