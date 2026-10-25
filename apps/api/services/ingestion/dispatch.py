@@ -37,13 +37,16 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
         from services.parser.pdf import _markdown_to_tree
         from models.content import CourseContentTree
         source_label = job.original_filename or job.url or "Untitled"
+        # Preserve source provenance independent of a user-facing page title.
+        # Deduplication must use the stable URL when the title later changes.
+        source_file = job.url if job.source_type == "url" and job.url else source_label
 
         # Dedup: remove existing content tree nodes from the same source
         # before inserting new ones (prevents duplicates on re-ingestion)
         existing = await db.execute(
             select(CourseContentTree.id).where(
                 CourseContentTree.course_id == job.course_id,
-                CourseContentTree.source_file == source_label,
+                CourseContentTree.source_file == source_file,
             )
         )
         old_ids = existing.scalars().all()
@@ -77,7 +80,7 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
                 )
             )
             await db.flush()
-            logger.info("Dedup: removed %d existing nodes for source %s", len(old_ids), source_label)
+            logger.info("Dedup: removed %d existing nodes for source %s", len(old_ids), source_file)
 
         # PPT files: split per slide for precise search
         is_pptx = source_name.endswith((".pptx", ".ppt"))
@@ -96,7 +99,7 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
                 level=0,
                 order_index=0,
                 content=root_summary,
-                source_file=source_label,
+                source_file=source_file,
                 source_type=job.source_type,
             )
             nodes = [root]
@@ -114,7 +117,7 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
                     level=1,
                     order_index=i,
                     content=slide_content,
-                    source_file=source_label,
+                    source_file=source_file,
                     source_type=job.source_type,
                 )
                 nodes.append(child)
@@ -123,12 +126,12 @@ async def dispatch_content(db: AsyncSession, job: IngestionJob) -> dict:
             nodes = _markdown_to_tree(
                 markdown=job.extracted_markdown,
                 course_id=job.course_id,
-                source_file=source_label,
+                source_file=source_file,
             )
         for node in nodes:
             # Normalize source metadata to the ingestion source (file/url).
             node.source_type = job.source_type
-            node.source_file = source_label
+            node.source_file = source_file
             node.content_category = category
             db.add(node)
         await db.flush()  # Assign IDs before indexing
