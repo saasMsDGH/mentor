@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mentor-model-runtime
+data:
+  LLM_PROVIDER: gemini
+  # Stable model documented by Google on 2026-10-25; verify account access
+  # during qualification. No API key, paid request or network grant here.
+  LLM_MODEL: gemini-3.8-flash

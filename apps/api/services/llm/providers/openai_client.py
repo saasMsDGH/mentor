@@ -1,5 +1,6 @@
 """OpenAI-compatible LLM client with vision support and tool calling."""
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncIterator
@@ -46,10 +47,12 @@ class OpenAIClient(LLMClient):
         self.model = model
 
     async def ping(self) -> bool:
-        """Active liveness probe for local backends (OpenClaw pattern).
+        """Probe local backends and authenticated Gemini model metadata.
 
         Classifies errors: unreachable / auth / rate_limit / timeout / server_error.
         """
+        if self.provider_name == "gemini":
+            return await self._ping_gemini()
         if self.provider_name not in self._NO_STREAM_OPTIONS:
             return self.is_healthy  # Cloud APIs: trust cached status
         try:
@@ -80,6 +83,38 @@ class OpenAIClient(LLMClient):
         except Exception as e:  # Catch-all: unexpected probe failures
             self.mark_unhealthy(f"probe_error: {e}")
             return False
+
+    async def _ping_gemini(self) -> bool:
+        """Check authenticated model metadata without sending a prompt.
+
+        Do not trust the initial circuit-breaker state as evidence of Gemini
+        reachability. Bound probe latency/retries; expose only error categories,
+        never provider response bodies or credentials in readiness diagnostics.
+        """
+        try:
+            async with asyncio.timeout(5.0):
+                model = await self.client.with_options(timeout=5.0, max_retries=0).models.retrieve(self.model)
+            if not isinstance(model.id, str) or model.id.removeprefix("models/") != self.model.removeprefix("models/"):
+                self.mark_unhealthy("model_mismatch")
+                return False
+            self.mark_healthy()
+            return True
+        except (openai.AuthenticationError, openai.PermissionDeniedError):
+            error = "auth_error"
+        except openai.NotFoundError:
+            error = "model_unavailable"
+        except openai.RateLimitError:
+            error = "rate_limited"
+        except (openai.APITimeoutError, TimeoutError):
+            error = "timeout"
+        except openai.APIConnectionError:
+            error = "unreachable"
+        except openai.APIStatusError as exc:
+            error = "server_error" if exc.status_code >= 500 else "unexpected_status"
+        except openai.APIError:
+            error = "invalid_provider_response"
+        self.mark_unhealthy(error)
+        return False
 
     async def stream_chat(self, system_prompt: str, user_message: str, images: list[dict] | None = None) -> AsyncIterator[str]:
         try:

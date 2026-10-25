@@ -219,6 +219,8 @@ jobs:
         run: |
           docker --host unix:///var/run/docker.sock pull pgvector/pgvector@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
           python scripts/test_postgres.py
+          # Dummy key on an internal-only network: Gemini must not appear ready.
+          python scripts/test_postgres.py --llm-provider gemini
       - name: Remove only this run's temporary image tags
         if: always()
         run: |

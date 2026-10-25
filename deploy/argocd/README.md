@@ -67,14 +67,23 @@ l'organisation, sont :
 |---|---|
 | Secret `mentor-postgres-migration` | `DATABASE_URL` du rôle DDL |
 | Secret `mentor-api-runtime` | `DATABASE_URL` DML, `JWT_SECRET_KEY`, `ENCRYPTION_KEY` |
-| Secret `mentor-model-credentials` | `CUSTOM_LLM_API_KEY` |
-| ConfigMap `mentor-model-runtime` | `LLM_PROVIDER`, `CUSTOM_LLM_BASE_URL`, `CUSTOM_LLM_MODEL` |
+| Secret `mentor-model-credentials` | `GEMINI_API_KEY` pour le profil qual |
+| ConfigMap `mentor-model-runtime` (fournie par l’overlay qual) | `LLM_PROVIDER=gemini`, `LLM_MODEL=gemini-3.8-flash` |
 
-Ne pas déduire des identifiants d'autres applications. L'endpoint/modèle MENTOR
-reste à confirmer. Le routeur `omniroute` existant refuse la consultation sans
-authentification ; aucun document ni appel de génération ne lui a été envoyé.
-Les seules sorties prévues sont DNS et IONOS `/32:5433` ; ajouter la destination
-inférence précise après validation, puis tester autorisations **et refus**.
+Le choix utilisateur est **Gemini**. Le profil qual utilise le connecteur natif
+existant, via l'endpoint Google compatible OpenAI, sans nouvelle dépendance.
+Le modèle stable proposé est `gemini-3.8-flash`, explicitement configuré ;
+il reste à vérifier avec le compte prévu. Voir le
+[contrat Gemini](../../docs/gemini-qualification.md). La clé Google n'est pas
+une clé OmniRoute : aucune clé d'une autre application n'est reprise.
+
+Les seules sorties actuellement prévues sont DNS et IONOS `/32:5433`.
+**L'accès Google reste bloqué** jusqu'à la préparation d'une sortie contrôlée
+vers `generativelanguage.googleapis.com:443`. Une NetworkPolicy Kubernetes
+standard ne filtre pas par domaine. La capacité FQDN du cluster n'est pas
+établie ; ne pas ajouter `0.0.0.0/0:443` ou figer une résolution DNS éphémère.
+Préparer une solution opérateur compatible avec le réseau existant, puis tester
+accès autorisé et refus. Le profil n'est pas qualifié tant que cela manque.
 
 ## Rendu et simulation, sans création de ressources
 

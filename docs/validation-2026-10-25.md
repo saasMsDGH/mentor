@@ -119,3 +119,29 @@ des lots initiaux, sans constituer une qualification du déploiement :
 Aucune fusion, publication d'image, synchronisation Argo CD ni modification
 de base distante n'a été effectuée. Les résultats locaux ne rendent pas verte
 la qualification runtime distante bloquée par le runner.
+
+### Choix Gemini et contrôles du candidat suivant
+
+Le choix utilisateur Gemini est préparé dans l'overlay qual avec le modèle
+stable proposé `gemini-3.8-flash` et la référence de Secret
+`mentor-model-credentials/GEMINI_API_KEY`. La sonde interroge désormais les
+métadonnées authentifiées du modèle au lieu de considérer le cloud sain par
+défaut. Les réponses/erreurs sont exercées sur un transport HTTP en mémoire ;
+aucun appel Google réel n'a été fait et aucune sortie Internet n'a été ouverte.
+
+Suite backend locale après ce lot : **1 031 réussis, 8 ignorés**, couverture
+**49,86 %**. Elle comprend 12 cas Gemini (authentification, modèle absent,
+erreurs réseau/quota, reprise, QCM, SSE/usage) et le contrat de configuration
+Gemini sans permission réseau générale. Voir [Gemini](gemini-qualification.md).
+
+L'image API reconstruite avec cette sonde passe aussi l'essai isolé
+`scripts/test_postgres.py --llm-provider gemini` : **5 tests PostgreSQL**,
+commande de migration production, refus de readiness Gemini avec clé factice,
+proxy web et restauration des **34 tables** réussis. Aucun port publié ni
+image poussée au registre ; ce refus attendu ne qualifie pas l'accès Google.
+
+Sur le commit précédent `1f04a0d`, le
+[run 40224903927](https://github.com/saasMsDGH/mentor/actions/runs/40224903927)
+termine backend, frontend et provenance avec succès. Le contrôle runtime échoue
+explicitement car le runner n'a toujours pas de moteur de conteneurs local.
+Cela ne constitue pas une erreur corrigée ni une qualification distante réussie.

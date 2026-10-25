@@ -74,3 +74,17 @@ Les tags `qualification-work` servent seulement à la validation locale. Une
 release doit être reconstruite à partir d'un commit figé, publiée dans un
 registre autorisé et référencée par les digests réellement publiés. Aucune image
 n'a été publiée et aucun déploiement ne découle de ces commandes de test.
+
+Pour exercer aussi Gemini indisponible dans l'image (clé factice éphémère,
+réseau interne fermé, aucune génération réelle) :
+
+```sh
+MENTOR_API_TEST_IMAGE=mentor-api:qualification-work \
+MENTOR_WEB_TEST_IMAGE=mentor-web:qualification-work \
+python scripts/test_postgres.py --llm-provider gemini
+```
+
+Le contrôle attend encore une readiness 503, même si le fournisseur Gemini
+est configuré. Son échec d'accès aux métadonnées ne doit jamais être traité
+comme une preuve de disponibilité. La CI prévoit les deux variantes, dès
+qu'un moteur de conteneurs CI isolé sera disponible.

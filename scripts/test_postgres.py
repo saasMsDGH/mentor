@@ -29,6 +29,8 @@ def docker(*args, **kwargs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--llm-provider", choices=("custom", "gemini"), default="custom",
+                        help="Unavailable provider to exercise closed production readiness; no real inference")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command
@@ -116,10 +118,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE mentor_migrate IN SCHEMA public GRANT USAGE, S
                            env=migration_environment)
                     print("Production migration command verified with DDL credentials only", flush=True)
                     api_name = name + "-api"
+                    llm_environment = {"LLM_PROVIDER": args.llm_provider}
+                    if args.llm_provider == "gemini":
+                        llm_environment.update(GEMINI_API_KEY=secrets.token_hex(32), LLM_MODEL="gemini-3.8-flash")
+                    else:
+                        llm_environment.update(CUSTOM_LLM_BASE_URL="http://127.0.0.1:9/v1",
+                                               CUSTOM_LLM_MODEL="qualification-unconfigured")
                     api_environment = {**os.environ,
                                        "DATABASE_URL": f"postgresql+asyncpg://mentor_runtime:{runtime_password}@/mentor_test?host=%2Fvar%2Frun%2Fpostgresql",
                                        "JWT_SECRET_KEY": secrets.token_hex(32),
-                                       "ENCRYPTION_KEY": base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()}
+                                       "ENCRYPTION_KEY": base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
+                                       **llm_environment}
                     api_started = False
                     web_started = False
                     network_started = False
@@ -139,8 +148,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE mentor_migrate IN SCHEMA public GRANT USAGE, S
                                "--tmpfs", "/tmp:rw,size=32m", "--tmpfs", "/app/uploads:rw,uid=10001,gid=10001,size=32m",
                                "--mount", f"type=bind,source={socket_dir},target=/var/run/postgresql,readonly",
                                "--env", "DATABASE_URL", "--env", "JWT_SECRET_KEY", "--env", "ENCRYPTION_KEY",
-                               "--env", "LLM_PROVIDER=custom", "--env", "CUSTOM_LLM_BASE_URL=http://127.0.0.1:9/v1",
-                               "--env", "CUSTOM_LLM_MODEL=qualification-unconfigured", api_image,
+                               *[arg for key in llm_environment for arg in ("--env", key)], api_image,
                                env=api_environment, stdout=subprocess.DEVNULL)
                         api_started = True
                         check = (ROOT / "scripts" / "check_api_image.py").read_text()
@@ -159,7 +167,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE mentor_migrate IN SCHEMA public GRANT USAGE, S
                             logs = subprocess.run([*DOCKER, "logs", "--tail", "20", api_name], text=True, capture_output=True)
                             diagnostic = logs.stdout + logs.stderr
                             for value in (admin_password, migration_password, runtime_password,
-                                          api_environment["JWT_SECRET_KEY"], api_environment["ENCRYPTION_KEY"]):
+                                          api_environment["JWT_SECRET_KEY"], api_environment["ENCRYPTION_KEY"],
+                                          *([llm_environment["GEMINI_API_KEY"]] if args.llm_provider == "gemini" else [])):
                                 diagnostic = diagnostic.replace(value, "[redacted]")
                             print(diagnostic, file=sys.stderr)
                         raise

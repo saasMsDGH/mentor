@@ -34,13 +34,19 @@ PR déjà ouvertes ; aucune fusion ni activation de déploiement n'en découle.
   ne prouve ni l'accès Git d'Argo, ni un rendu distant, ni un déploiement.
 - Les images locales passent les contrôles non root/lecture seule, proxy et
   authentification. Sans inférence autorisée, la readiness reste **503**.
-  Aucune image n'est publiée. L'endpoint/modèle et ses références de secrets,
-  le TLS PostgreSQL et le provisionnement dédié restent à qualifier.
+  Aucune image n'est publiée. Gemini a ensuite été choisi par l'utilisateur :
+  le profil qual prévoit son connecteur natif et `gemini-3.8-flash`, clé via
+  `mentor-model-credentials/GEMINI_API_KEY`. Accès au compte, sortie réseau
+  limitée au domaine Google, TLS PostgreSQL et provisionnement dédié restent
+  à qualifier.
 - Le run candidat `40223763535` valide 999 tests backend et 6 tests SQLite,
   puis échoue : le runner `org-runner-subst` n'a pas de démon Docker local.
   Le contrôle runtime conserve un échec bloquant explicite tant qu'un moteur
   de conteneurs CI isolé n'est pas disponible. Il n'est ni ignoré ni remplacé
   par un succès local.
+- Sur `1f04a0d`, le [run 40224903927](https://github.com/saasMsDGH/mentor/actions/runs/40224903927)
+  termine backend, frontend et provenance avec succès ; seul le contrôle
+  runtime échoue sur le prérequis de moteur de conteneurs isolé.
 - L'API GitHub indique actuellement `protected: false` pour `main`. Les règles
   de promotion ci-dessous sont documentées, pas encore imposées par une règle
   de protection ou un contrôle de qualification automatisé.

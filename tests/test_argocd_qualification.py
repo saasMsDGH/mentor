@@ -120,3 +120,21 @@ def test_actual_kustomize_overlay_order_storage_and_scope(environment):
                         assert peer.get("podSelector", {}).get("matchLabels")
                     if "ipBlock" in peer:
                         assert peer["ipBlock"]["cidr"].endswith("/32")
+
+
+def test_qualification_selects_gemini_without_opening_general_internet_access():
+    rendered = subprocess.run(["kubectl", "kustomize", "k8s/overlays/qual"], cwd=ROOT,
+                              text=True, capture_output=True, check=True)
+    resources = list(yaml.safe_load_all(rendered.stdout))
+    config = next(r for r in resources if r["kind"] == "ConfigMap" and r["metadata"]["name"] == "mentor-model-runtime")
+    assert config["data"] == {"LLM_PROVIDER": "gemini", "LLM_MODEL": "gemini-3.8-flash"}
+    api = next(r for r in resources if r["kind"] == "Deployment" and r["metadata"]["name"] == "mentor-api")
+    container = api["spec"]["template"]["spec"]["containers"][0]
+    env = {e["name"]: e for e in container["env"]}
+    assert env["GEMINI_API_KEY"]["valueFrom"]["secretKeyRef"] == {"name": "mentor-model-credentials", "key": "GEMINI_API_KEY"}
+    assert env["LLM_MODEL"]["valueFrom"]["configMapKeyRef"]["key"] == "LLM_MODEL"
+    assert not any(name.startswith("CUSTOM_LLM_") for name in env)
+    assert container["readinessProbe"]["timeoutSeconds"] > 5
+    # FQDN-limited egress is an operator prerequisite, not a blanket TCP/443 grant.
+    policies = [r for r in resources if r["kind"] == "NetworkPolicy"]
+    assert not any(port["port"] == 443 for r in policies for rule in r["spec"].get("egress", []) for port in rule.get("ports", []))

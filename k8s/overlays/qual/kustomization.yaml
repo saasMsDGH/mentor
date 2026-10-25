@@ -4,6 +4,7 @@ namespace: mentor-qual
 resources:
   - ../../base
   - ingressroute.yaml
+  - model.yaml
 # Activation still requires a rendered Application with approved image digests,
 # operator-provisioned secrets and an explicit Argo CD sync.
 replicas:
@@ -28,8 +29,20 @@ patches:
                 env:
                   - name: CORS_ORIGINS
                     value: https://mentor.qual.dgsynthex.online
-                  - name: CUSTOM_LLM_API_KEY
+                  - name: CUSTOM_LLM_BASE_URL
+                    $patch: delete
+                  - name: CUSTOM_LLM_MODEL
+                    $patch: delete
+                  - name: LLM_MODEL
+                    valueFrom:
+                      configMapKeyRef:
+                        name: mentor-model-runtime
+                        key: LLM_MODEL
+                  - name: GEMINI_API_KEY
                     valueFrom:
                       secretKeyRef:
                         name: mentor-model-credentials
-                        key: CUSTOM_LLM_API_KEY
+                        key: GEMINI_API_KEY
+                readinessProbe:
+                  timeoutSeconds: 10
+                  periodSeconds: 30
