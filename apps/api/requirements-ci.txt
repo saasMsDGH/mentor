@@ -1,0 +1,17 @@
+# CI unit-test profile for the single-user OpenTutor baseline.
+# Keep optional heavy integrations (pix2tex, browser/vision models) out of the
+# standard self-hosted runner to avoid large GPU/torch installations.
+# Integration suites requiring these packages need a dedicated job/profile.
+-r requirements-core.txt
+
+# Scheduler, optional storage and BKT runtime exercised by unit tests.
+redis==5.2.1
+apscheduler>=3.10.0,<4.0.0
+pyBKT==1.4.1
+
+# Tools and mocks required by the unit suite.
+pytest>=8.0,<10.0
+pytest-asyncio>=0.23,<2.0
+pytest-cov>=5.0,<8.0
+pytest-timeout>=2.3,<3.0
+hypothesis>=6.100.0

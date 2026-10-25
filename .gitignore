@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build
+.next/
+out/
+dist/
+*.egg-info/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+
+# Python
+*.egg
+*.whl
+pip-log.txt
+.coverage
+htmlcov/
+
+# Claude Code
+.claude/
+
+# Test artifacts
+test-results/
+playwright-report/
+tmp/
+.hypothesis/
+
+# Temporary directories
+sessions/
+
+# Local database
+*.db
+*.sqlite

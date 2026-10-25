@@ -2,7 +2,7 @@
 
 MENTOR est une plateforme d'apprentissage adaptatif, auto-hébergeable et pensée pour les étudiants et professionnels préparant des concours, examens et certifications.
 
-> **État du dépôt : initialisation.** Le code applicatif n'a pas encore été importé. Les fonctionnalités ci-dessous décrivent la cible produit, pas une version exécutable de MENTOR.
+> **État : import amont effectué sur `feature/import-opentutor`, validation CI en cours.** Le projet n'est pas encore déployable en production et n'a pas encore été sécurisé pour un accès multi-utilisateur. Les fonctionnalités cibles restent à valider individuellement.
 
 ## Décision de socle
 
@@ -36,8 +36,8 @@ Le code d'OpenTutor est sous licence MIT (copyright Zijin Zhang, 2026). Study As
 
 ## Démarrage des travaux
 
-Voir [l'architecture](docs/architecture.md), [la feuille de route](docs/roadmap.md) et [les décisions d'architecture](docs/adr/0001-opentutor-as-foundation.md) **une fois la PR d'initialisation fusionnée**.
+Voir [l'architecture](docs/architecture.md), [la feuille de route](docs/roadmap.md) et [les décisions d'architecture](docs/adr/0001-opentutor-as-foundation.md).
 
-Les premiers travaux sont : import contrôlé d'OpenTutor (licence et historique des modifications), audit et tests amont, sécurisation, migration PostgreSQL, PWA, pipeline documentaire sourcé, puis examens.
+Le code OpenTutor a été importé à la révision figée, avec sa licence MIT et ses sources de tests. Les travaux suivants sont : tests amont, audit de sécurité, migration PostgreSQL, PWA, pipeline documentaire sourcé puis examens. **Ne pas exposer le Docker Compose amont sur un réseau : authentification désactivée et socket Docker monté par défaut.**
 
 Le premier parcours de démonstration sera « Concours d'officier de gendarmerie interne — Préparation 2027 ». Il est **indicatif**, jamais présenté comme référentiel officiel sans source contrôlée.
